@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+const logoUrl = 'https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780483670/TkLogo-bgremove_xfnydo.png';
+
 const Header = ({ alwaysDark = false, onNavigate }) => {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -22,7 +24,9 @@ const Header = ({ alwaysDark = false, onNavigate }) => {
 
   return (
     <header className={`header ${scrolled || menuOpen ? 'scrolled' : ''} ${alwaysDark ? 'always-dark' : ''}`}>
-      <a href="/" className="logo" onClick={(event) => handleNavigate(event, 'home')}>TK MOMENTS</a>
+      <a href="/" className="logo" onClick={(event) => handleNavigate(event, 'home')} aria-label="TK Moments home">
+        <img src={logoUrl} alt="TK Moments" className="logo-image" />
+      </a>
 
       <nav id="primary-navigation" className={`nav-links ${menuOpen ? 'open' : ''}`}>
         <a href="/" onClick={(event) => handleNavigate(event, 'home')}>Home</a>

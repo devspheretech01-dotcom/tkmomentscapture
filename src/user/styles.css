@@ -262,19 +262,22 @@ ul {
 }
 
 .header .logo {
-  font-family: var(--font-heading);
-  font-size: 1.8rem;
-  font-weight: 600;
-  letter-spacing: 2px;
-  color: #fff;
-  transition: color 0.4s ease;
-  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
   line-height: 1;
 }
 
-.header.scrolled .logo,
-.header.always-dark .logo {
-  color: var(--primary);
+.header .logo-image {
+  display: block;
+  width: auto;
+  height: 84px;
+  object-fit: contain;
+  transition: height 0.4s ease;
+}
+
+.header.scrolled .logo-image {
+  height: 60px;
 }
 
 .nav-links {
@@ -1238,6 +1241,14 @@ ul {
   display: block;
 }
 
+.footer-logo-image {
+  display: block;
+  width: auto;
+  height: 72px;
+  object-fit: contain;
+  margin-bottom: 1rem;
+}
+
 .footer-info {
   max-width: 300px;
   font-size: 0.9rem;
@@ -1375,10 +1386,12 @@ ul {
   }
 
   .header .logo {
-    font-size: clamp(1.25rem, 5vw, 1.65rem);
     max-width: calc(100vw - 5rem);
-    overflow: hidden;
-    text-overflow: ellipsis;
+  }
+
+  .header .logo-image,
+  .header.scrolled .logo-image {
+    height: 56px;
   }
 
   .nav-links {

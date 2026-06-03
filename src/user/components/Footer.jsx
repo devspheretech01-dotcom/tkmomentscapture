@@ -1,10 +1,12 @@
+const logoUrl = "https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780483670/TkLogo-bgremove_xfnydo.png";
+
 const Footer = () => {
   return (
     <footer id="contact" className="footer">
       <div className="container" style={{ padding: 0 }}>
         <div className="footer-content">
           <div className="footer-brand">
-            <span className="footer-logo">TK MOMENTS</span>
+            <img src={logoUrl} alt="TK Moments" className="footer-logo-image" />
             <p className="footer-info">
               International award-winning wedding photography and filmmaking company based in Mumbai, India. Documenting love since 2014.
             </p>
@@ -36,7 +38,9 @@ const Footer = () => {
         
         <div className="footer-bottom">
           <p>&copy; {new Date().getFullYear()} TK Moments. All rights reserved.</p>
-          <p>Designed with Love</p>
+          <a href="mailto:devsphere.tech01@gmail.com" style={{ fontWeight: 700, textAlign: 'center' }}>
+            Designed &amp; Developed by Devsphere
+          </a>
         </div>
       </div>
     </footer>

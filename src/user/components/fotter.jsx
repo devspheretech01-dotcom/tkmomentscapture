@@ -1,6 +1,8 @@
 import React from "react";
 import { ArrowUpRight, Camera, Mail, MapPin, Phone, Share2, Video } from "lucide-react";
 
+const logoUrl = "https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780483670/TkLogo-bgremove_xfnydo.png";
+
 const footerLinks = [
   { label: "Home", target: "home" },
   { label: "Packages", target: "packages" },
@@ -9,7 +11,7 @@ const footerLinks = [
 ];
 
 const contactItems = [
-  { icon: Mail, label: "tkmoments@gmail.com", href: "mailto:tkmoments@gmail.com" },
+  { icon: Mail, label: "tkmoments16@gmail.com", href: "mailto:tkmoments16@gmail.com" },
   { icon: Phone, label: "+91 8200437072", href: "tel:+918200437072" },
   {
     icon: MapPin,
@@ -39,12 +41,14 @@ const MinimalFooter = ({ onNavigate }) => {
         <div className="grid min-w-0 gap-9 sm:grid-cols-2 lg:grid-cols-[1.2fr_0.8fr_1fr] lg:items-start">
           <div className="min-w-0 max-w-md sm:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full border border-neutral-200 bg-neutral-950 text-white shadow-sm">
-                <Camera size={20} />
-              </span>
+              <img
+                src={logoUrl}
+                alt="TK Moments"
+                className="h-14 w-14 flex-none rounded-full object-contain shadow-sm"
+              />
               <div className="min-w-0">
                 <h2 className="text-xl font-semibold tracking-wide text-neutral-950 sm:text-2xl">
-                  TK MOMENTS
+                  TK MOMENTS CAPTURE
                 </h2>
                 <p className="text-sm text-neutral-500">Wedding . Pre-wedding . Events</p>
               </div>
@@ -103,9 +107,15 @@ const MinimalFooter = ({ onNavigate }) => {
         </div>
 
         <div className="mt-10 flex flex-col items-center justify-between gap-5 border-t border-neutral-200 pt-6 text-center sm:flex-row sm:text-left">
-          <p className="text-sm leading-6 text-neutral-500">
-            &copy; 2026 TK MOMENTS - Capturing timeless memories.
-          </p>
+          <div className="space-y-1 text-center text-sm leading-6 text-neutral-500">
+            <p>&copy; 2026 TK MOMENTS - Capturing timeless memories.</p>
+            <a
+              href="mailto:devsphere.tech01@gmail.com"
+              className="inline-flex font-bold text-neutral-500 transition hover:text-neutral-950"
+            >
+              Designed &amp; Developed by Devsphere
+            </a>
+          </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3">
             {socialLinks.map(({ icon: Icon, label, target }) => (

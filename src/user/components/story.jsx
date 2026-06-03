@@ -1,11 +1,11 @@
 import { useState } from "react";
 
 const films = [
-  { id: 1, names: "Dhruv & Pippa", bg: "linear-gradient(135deg,#e8c97a,#c9954a)", image: "https://images.unsplash.com/photo-1665960213508-48f07086d49c?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", textStyle: "italic" },
-  { id: 2, names: "Palak & Priya", bg: "linear-gradient(135deg,#f4b8d0,#e07fa0)", image: "https://images.unsplash.com/photo-1727430256509-0f897d6f4765?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", textStyle: "italic" },
-  { id: 3, names: "Indu & Sahil", bg: "linear-gradient(135deg,#b8d4c8,#6aaa8e)", image: "https://images.unsplash.com/photo-1633104502699-b2ecf0fee294?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", textStyle: "italic" },
-  { id: 4, names: "AVI\nVAI", bg: "linear-gradient(135deg,#f0f0ec,#d8d4c8)", image: "https://images.unsplash.com/photo-1727430334033-d2ffe559bdce?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", textStyle: "logo" },
-  { id: 5, names: "Divya & Rohan", bg: "linear-gradient(135deg,#f7d6c4,#e89060)", image: "https://images.unsplash.com/photo-1735052712489-f45220126a0c?q=80&w=680&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", textStyle: "italic" },
+  { id: 1, names: "Dhruv & Pippa", bg: "linear-gradient(135deg,#e8c97a,#c9954a)", image: "https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780480769/WhatsApp_Image_2026-06-01_at_7.21.05_PM_1_oq9zbj.jpg", textStyle: "italic" },
+  { id: 2, names: "Palak & Priya", bg: "linear-gradient(135deg,#f4b8d0,#e07fa0)", image: "https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780480770/WhatsApp_Image_2026-06-01_at_7.21.05_PM_cstom2.jpg", textStyle: "italic" },
+  { id: 3, names: "Indu & Sahil", bg: "linear-gradient(135deg,#b8d4c8,#6aaa8e)", image: "https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780480767/WhatsApp_Image_2026-06-01_at_7.21.03_PM_1_ot69ar.jpg", textStyle: "italic" },
+  { id: 4, names: "AVI\nVAI", bg: "linear-gradient(135deg,#f0f0ec,#d8d4c8)", image: "https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780480769/WhatsApp_Image_2026-06-01_at_7.21.02_PM_1_egzcau.jpg", textStyle: "logo" },
+  { id: 5, names: "Divya & Rohan", bg: "linear-gradient(135deg,#f7d6c4,#e89060)", image: "https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780480769/WhatsApp_Image_2026-06-01_at_7.21.06_PM_1_jphxva.jpg", textStyle: "italic" },
 ];
 
 export default function WeddingCarousel() {
@@ -18,19 +18,19 @@ export default function WeddingCarousel() {
   const visibleFilms = films.slice(current, current + visible);
 
   return (
-    <div id="wedding-films" className="wedding-carousel" style={{ background: "#c4b09a", padding: "48px 40px 40px", position: "relative" }}>
+    <div id="wedding-films" className="wedding-carousel" style={{ background: "#ccc2b7b4", padding: "48px 40px 40px", position: "relative" }}>
       <div className="wedding-carousel-header" style={{ marginBottom: 40, textAlign: "center" }}>
         <h1
           className="wedding-carousel-title"
           style={{
             fontSize: 48,
-            fontFamily: "Georgia, serif",
+            fontFamily: "'Parisienne', cursive",
             fontWeight: 700,
-            color: "#2c1810",
+            color: "#e25f1d",
             textShadow: "2px 2px 4px rgba(0,0,0,0.1)",
             marginBottom: 0,
             letterSpacing: 1,
-            background: "linear-gradient(135deg, #3d251a 0%, #2c1810 100%)",
+            background: "linear-gradient(135deg, rgb(61, 37, 26) 0%, rgb(255 123 70) 100%) text",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",

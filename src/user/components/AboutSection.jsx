@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 
 const weddingPhoto =
-  "https://images.unsplash.com/photo-1519741497674-611481863552?w=900&q=80";
+  "https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780480766/WhatsApp_Image_2026-06-01_at_7.20.53_PM_iajgs7.jpg";
 
 const stats = [
   { value: "500+", label: "Weddings" },

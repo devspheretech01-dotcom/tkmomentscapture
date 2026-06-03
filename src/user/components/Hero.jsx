@@ -12,7 +12,7 @@ const Hero = ({ onBuildPackage }) => {
         playsInline
         className="absolute w-full h-full object-cover"
       >
-        <source src="/tk-video.mp4" type="video/mp4" />
+        <source src="https://res.cloudinary.com/dx8zo5ukg/video/upload/q_auto/f_auto/v1780484218/tkvideo_1_v0cvnp.mp4" type="video/mp4" />
       </video>
 
       {/* Dark Overlay */}
@@ -22,7 +22,7 @@ const Hero = ({ onBuildPackage }) => {
       <div className="relative z-10 flex min-h-[100svh] flex-col items-center justify-center px-4 pt-20 text-center text-white sm:items-start sm:px-10 sm:text-left lg:px-20 xl:px-28">
         
         <h1 className="hero-brand-script mb-4 max-w-full text-6xl font-normal tracking-normal text-[#fff7e8] sm:text-7xl md:text-8xl lg:text-[6.8rem]">
-          TK Moments
+          TK Moments 
         </h1>
 
         <p className="mb-6 max-w-[22rem] text-base font-light sm:text-lg md:max-w-none md:text-xl">
