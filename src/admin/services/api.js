@@ -1,21 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://tk-backend-y1vb.onrender.com/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
 async function request(path, options = {}) {
+  const { skipAuthRedirect = false, ...fetchOptions } = options;
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: "include",
-    headers: options.body instanceof FormData ? options.headers : {
+    headers: fetchOptions.body instanceof FormData ? fetchOptions.headers : {
       "Content-Type": "application/json",
-      ...options.headers,
+      ...fetchOptions.headers,
     },
-    ...options,
+    ...fetchOptions,
   });
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.success === false) {
     const message = data.message || "Request failed";
-    if (/token|unauthorized|refresh/i.test(message) && !path.endsWith("/login")) {
+    if (!skipAuthRedirect && /token|unauthorized|refresh/i.test(message) && !path.endsWith("/login")) {
       if (window.location.pathname.startsWith("/admin") && window.location.pathname !== "/admin/login") {
         window.location.href = "/admin/login";
       }
@@ -43,6 +44,10 @@ export const adminLogin = (payload) => request("/admin/login", {
 });
 
 export const adminLogout = () => request("/admin/logout", { method: "POST" });
+
+export const verifyAdminSession = () => request("/admin/dashboard", {
+  skipAuthRedirect: true,
+});
 
 export function useGetDashboardSummary() {
   return useQuery({

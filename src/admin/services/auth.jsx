@@ -1,11 +1,32 @@
-import { createContext, useContext, useState } from "react";
-import { adminLogin, adminLogout } from "@admin/services/api";
+import { createContext, useContext, useEffect, useState } from "react";
+import { adminLogin, adminLogout, verifyAdminSession } from "@admin/services/api";
 
 const AuthContext = createContext(undefined);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [loading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    verifyAdminSession()
+      .then(() => {
+        if (isMounted) {
+          setUser({ id: "admin", name: "Admin TK", role: "admin" });
+        }
+      })
+      .catch(() => {
+        if (isMounted) setUser(null);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const login = async (email, password) => {
     await adminLogin({ email, password });
