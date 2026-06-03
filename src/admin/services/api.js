@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
+const API_BASE_URL = `${(import.meta.env.VITE_API_URL || "").replace(/\/$/, "")}/api`;
 
 async function request(path, options = {}) {
   const { skipAuthRedirect = false, ...fetchOptions } = options;

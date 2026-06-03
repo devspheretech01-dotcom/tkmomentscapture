@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import UserLayout from "@user/layouts/UserLayout";
 import Header from "@user/components/Header";
 import Hero from "@user/components/Hero";
@@ -12,61 +13,55 @@ import Packageposter from "@user/components/packageposter";
 import ContactUs from "@user/components/contact";
 import MinimalFooter from "@user/components/fotter";
 
-const hashToPage = {
-  "#wedding-stories": "wedding-stories",
-  "#wedding-films": "wedding-films",
-  "#about": "about",
-  "#contact": "contact",
+const pageRoutes = {
+  "wedding-stories": "/wedding-stories",
+  "wedding-films": "/wedding-films",
+  about: "/about",
+  contact: "/contact",
 };
 
-const pathToPage = {
-  "/wedding-stories": "wedding-stories",
-  "/wedding-films": "wedding-films",
-  "/about": "about",
-  "/contact": "contact",
-};
-
-function getPageFromLocation() {
-  return hashToPage[window.location.hash] || pathToPage[window.location.pathname] || "home";
+function HomePage({ onBuildPackage }) {
+  return (
+    <>
+      <Hero onBuildPackage={onBuildPackage} />
+      <TKMoments />
+      <WeddingCarousel />
+      <Packageposter onBuildPackage={onBuildPackage} />
+    </>
+  );
 }
 
 export default function UserRoutes() {
   const [showPackageBuilder, setShowPackageBuilder] = useState(false);
-  const [currentPage, setCurrentPage] = useState(getPageFromLocation);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  useEffect(() => {
-    const syncPageWithLocation = () => {
-      setCurrentPage(getPageFromLocation());
-    };
-
-    window.addEventListener("hashchange", syncPageWithLocation);
-    window.addEventListener("popstate", syncPageWithLocation);
-    return () => {
-      window.removeEventListener("hashchange", syncPageWithLocation);
-      window.removeEventListener("popstate", syncPageWithLocation);
-    };
-  }, []);
+  const isStandalonePage =
+    location.pathname === "/wedding-stories" ||
+    location.pathname === "/wedding-films" ||
+    location.pathname === "/about" ||
+    location.pathname === "/contact";
 
   const handleNavigate = (target) => {
     setShowPackageBuilder(false);
 
-    if (
-      target === "wedding-stories" ||
-      target === "wedding-films" ||
-      target === "about" ||
-      target === "contact"
-    ) {
-      setCurrentPage(target);
-      window.history.pushState(null, "", `#${target}`);
+    if (pageRoutes[target]) {
+      navigate(pageRoutes[target]);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
-    setCurrentPage("home");
-    window.history.pushState(null, "", `#${target}`);
-    window.setTimeout(() => {
-      document.getElementById(target)?.scrollIntoView({ behavior: "smooth" });
-    }, 0);
+    navigate("/");
+
+    if (target === "home") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    window.setTimeout(
+      () => document.getElementById(target)?.scrollIntoView({ behavior: "smooth" }),
+      0
+    );
   };
 
   return (
@@ -76,30 +71,17 @@ export default function UserRoutes() {
       ) : (
         <>
           <Header
-            alwaysDark={
-              currentPage === "wedding-stories" ||
-              currentPage === "wedding-films" ||
-              currentPage === "about" ||
-              currentPage === "contact"
-            }
+            alwaysDark={isStandalonePage}
             onNavigate={handleNavigate}
           />
-          {currentPage === "wedding-stories" ? (
-            <WeddingStories />
-          ) : currentPage === "wedding-films" ? (
-            <WeddingFilms />
-          ) : currentPage === "about" ? (
-            <AboutPage />
-          ) : currentPage === "contact" ? (
-            <ContactUs />
-          ) : (
-            <>
-              <Hero onBuildPackage={() => setShowPackageBuilder(true)} />
-              <TKMoments />
-              <WeddingCarousel />
-              <Packageposter onBuildPackage={() => setShowPackageBuilder(true)} />
-            </>
-          )}
+          <Routes>
+            <Route path="/" element={<HomePage onBuildPackage={() => setShowPackageBuilder(true)} />} />
+            <Route path="/wedding-stories" element={<WeddingStories />} />
+            <Route path="/wedding-films" element={<WeddingFilms />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/contact" element={<ContactUs />} />
+            <Route path="*" element={<HomePage onBuildPackage={() => setShowPackageBuilder(true)} />} />
+          </Routes>
           <MinimalFooter onNavigate={handleNavigate} />
         </>
       )}
