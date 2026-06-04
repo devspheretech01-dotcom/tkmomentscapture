@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { ArrowLeft, Plus, Camera, Sparkles } from 'lucide-react'
+import { ArrowLeft, Plus, Sparkles } from 'lucide-react'
 import { Button } from './ui/button'
 import { Separator } from './ui/separator'
 import { EventCard } from './event-card'
@@ -8,6 +8,8 @@ import { PricingSummary } from './pricing-summary'
 import { PreviewModal } from './preview-modal'
 import { SERVICES, normalizeService } from '@user/services/package-data'
 import { getServices } from '@user/services/api'
+
+const logoUrl = 'https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780483670/TkLogo-bgremove_xfnydo.png'
 
 function generateId() {
   return Math.random().toString(36).substring(2, 9)
@@ -124,9 +126,11 @@ export function PackageBuilder({ onBack }) {
               <ArrowLeft className="size-4 mr-2" />
               Back
             </Button>
-            <div className="size-9 sm:size-10 shrink-0 rounded-full bg-primary flex items-center justify-center">
-              {/* <Camera className="size-5 text-primary-foreground" /> */}
-            </div>
+            <img
+              src={logoUrl}
+              alt="TK Moments"
+              className="h-9 w-auto shrink-0 object-contain sm:h-10"
+            />
             {/* <div className="min-w-0">
               <h1 className="truncate text-lg sm:text-xl font-semibold text-foreground">Wedding Package Builder</h1>
               <p className="truncate text-xs sm:text-sm text-muted-foreground">Create your perfect photography package</p>

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Camera, Clapperboard, Heart, MapPin } from "lucide-react";
 
 const values = [
@@ -67,7 +68,7 @@ export default function AboutPage() {
       <div className="about-page-bg-word" aria-hidden="true">Moments</div>
       <section className="about-page-hero">
         <div className="about-page-copy">
-          <span className="about-page-kicker">About TK Moments</span>
+          <span className="about-page-kicker">About TK Moments capture</span>
           <h1>We turn wedding days into stories you can return to forever.</h1>
           <p>
             TK Moments is a wedding photography and filmmaking studio based in Bharuch,
@@ -79,9 +80,9 @@ export default function AboutPage() {
             with editorial polish so your photographs feel honest today and beautiful years
             from now.
           </p>
-          <a className="btn btn-solid" href="#contact">
+          <Link className="btn btn-solid" to="/contact">
             Start a Conversation
-          </a>
+          </Link>
 
           <div className="about-page-highlights" aria-label="TK Moments highlights">
             {highlights.map((highlight) => (

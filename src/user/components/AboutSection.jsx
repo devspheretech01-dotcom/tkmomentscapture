@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 const weddingPhoto =
   "https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780480766/WhatsApp_Image_2026-06-01_at_7.20.53_PM_iajgs7.jpg";
@@ -13,6 +14,7 @@ const stats = [
 
 export default function TKMoments() {
   const [visible, setVisible] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const timer = setTimeout(() => setVisible(true), 100);
@@ -106,8 +108,22 @@ export default function TKMoments() {
           </p>
 
           <div className="tk-about-actions" style={styles.ctaRow}>
-            <button className="tk-about-primary" style={styles.primaryBtn}>View Portfolio</button>
-            <button className="tk-about-secondary" style={styles.secondaryBtn}>Get in Touch -&gt;</button>
+            <button
+              className="tk-about-primary"
+              style={styles.primaryBtn}
+              type="button"
+              onClick={() => navigate("/wedding-stories")}
+            >
+              View Portfolio
+            </button>
+            <button
+              className="tk-about-secondary"
+              style={styles.secondaryBtn}
+              type="button"
+              onClick={() => navigate("/contact")}
+            >
+              Get in Touch -&gt;
+            </button>
           </div>
         </div>
       </section>
@@ -308,4 +324,3 @@ const styles = {
     textTransform: "uppercase",
   },
 };
-

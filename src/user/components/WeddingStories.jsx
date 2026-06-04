@@ -22,6 +22,27 @@ const popularStories = [
     image:
       "https://images.unsplash.com/photo-1591604466107-ec97de577aff?auto=format&fit=crop&q=85&w=1200",
   },
+  {
+    title: "Meera & Aarav's Palace Wedding in Jaipur",
+    excerpt:
+      "A celebration wrapped in marigolds, candlelit courtyards, and music that carried through the palace halls, their wedding felt royal without ever losing its warmth.",
+    image:
+      "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=85&w=1200",
+  },
+  {
+    title: "Nisha & Dev's Elegant Garden Wedding",
+    excerpt:
+      "Soft florals, honest laughter, and a golden evening ceremony came together in a wedding story full of quiet charm and beautifully personal details.",
+    image:
+      "https://images.unsplash.com/photo-1507504031003-b417219a0fde?auto=format&fit=crop&q=85&w=1200",
+  },
+  {
+    title: "Priya & Kabir's Classic Mumbai Reception",
+    excerpt:
+      "From an emotional mandap ceremony to a high-energy reception night, Priya and Kabir's wedding moved with grace, glamour, and family at its heart.",
+    image:
+      "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?auto=format&fit=crop&q=85&w=1200",
+  },
 ];
 
 const destinationStories = [
@@ -46,6 +67,27 @@ const destinationStories = [
     image:
       "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=85&w=1200",
   },
+  {
+    title: "Aditi & Rohan's Udaipur Lake Wedding",
+    excerpt:
+      "Set against still blue water and old-world architecture, their destination wedding blended intimate rituals, sunset portraits, and a celebration that glowed after dark.",
+    image:
+      "https://images.unsplash.com/photo-1494955870715-979ca4f13bf0?auto=format&fit=crop&q=85&w=1200",
+  },
+  {
+    title: "Kiara & Arjun: Beachside Vows in Phuket",
+    excerpt:
+      "A breezy coastal celebration with barefoot vows, tropical florals, and a reception under the stars made this destination wedding feel effortless and cinematic.",
+    image:
+      "https://images.unsplash.com/photo-1537633552985-df8429e8048b?auto=format&fit=crop&q=85&w=1200",
+  },
+  {
+    title: "Sanya & Viren's Tuscan Villa Celebration",
+    excerpt:
+      "Rolling vineyards, long-table dinners, and golden countryside light shaped a romantic destination wedding story with a soft, editorial mood.",
+    image:
+      "https://images.unsplash.com/photo-1529634897087-143525e0d39b?auto=format&fit=crop&q=85&w=1200",
+  },
 ];
 
 function StoryCard({ story }) {
@@ -57,9 +99,6 @@ function StoryCard({ story }) {
       <div className="wedding-story-copy">
         <h3>{story.title}</h3>
         <p>{story.excerpt}</p>
-        <a href="#" className="wedding-story-read-more">
-          Read More <span aria-hidden="true">→</span>
-        </a>
       </div>
     </article>
   );

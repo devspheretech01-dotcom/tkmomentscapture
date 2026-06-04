@@ -1,4 +1,4 @@
-
+import { Link } from "react-router-dom";
 
 const Hero = ({ onBuildPackage }) => {
   return (
@@ -30,12 +30,12 @@ const Hero = ({ onBuildPackage }) => {
         </p>
 
         <div className="flex flex-col items-center gap-3 sm:items-start">
-          <a
-            href="#contact"
+          <Link
+            to="/contact"
             className="inline-flex w-56 justify-center rounded-full border border-white px-6 py-3 text-sm tracking-wide transition hover:bg-white hover:text-black"
           >
             Get in Touch
-          </a>
+          </Link>
 
           <button
             type="button"
