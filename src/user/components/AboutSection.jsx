@@ -6,8 +6,8 @@ const weddingPhoto =
   "https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780480766/WhatsApp_Image_2026-06-01_at_7.20.53_PM_iajgs7.jpg";
 
 const stats = [
-  { value: "500+", label: "Weddings" },
-  { value: "12+", label: "Years" },
+  { value: "800+", label: "Weddings" },
+  { value: "10+", label: "Years" },
   { value: "30+", label: "Awards" },
   { value: "98%", label: "Happy Clients" },
 ];

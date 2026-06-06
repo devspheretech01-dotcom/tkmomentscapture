@@ -12,7 +12,7 @@ const Hero = ({ onBuildPackage }) => {
         playsInline
         className="absolute w-full h-full object-cover"
       >
-        <source src="https://res.cloudinary.com/dx8zo5ukg/video/upload/q_auto/f_auto/v1780484218/tkvideo_1_v0cvnp.mp4" type="video/mp4" />
+        <source src="https://res.cloudinary.com/dx8zo5ukg/video/upload/q_auto/f_auto/v1780744826/web_1_xc1iju.mp4" type="video/mp4" />
       </video>
 
       {/* Dark Overlay */}

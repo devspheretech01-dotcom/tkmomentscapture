@@ -10,6 +10,7 @@ import WeddingFilms from "@user/components/WeddingFilms";
 import AboutPage from "@user/components/AboutPage";
 import { PackageBuilder } from "@user/components/package-builder";
 import Packageposter from "@user/components/packageposter";
+import Instagram from "@user/components/instagram";
 import ContactUs from "@user/components/contact";
 import MinimalFooter from "@user/components/fotter";
 
@@ -27,6 +28,7 @@ function HomePage({ onBuildPackage }) {
       <TKMoments />
       <WeddingCarousel />
       <Packageposter onBuildPackage={onBuildPackage} />
+      <Instagram />
     </>
   );
 }

@@ -107,19 +107,16 @@ export function GrandTotalDisplay({
 
       {/* Album Summary */}
       <div className="space-y-4 rounded-lg border border-border/70 bg-muted/20 p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-3">
-          <h4 className="font-semibold text-foreground">Album Add-ons</h4>
-          <span className="text-sm font-semibold text-primary">{formatPrice(albumTotal)}</span>
-        </div>
+        <h4 className="font-semibold text-foreground">Album Add-ons</h4>
         {albumLineItems.length > 0 ? (
           <div className="space-y-2">
             {albumLineItems.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between gap-4 text-sm text-muted-foreground"
+                className="flex items-center gap-2 text-sm text-muted-foreground"
               >
+                <Check className="size-3 text-green-600" />
                 <span className="min-w-0 break-words">{item.name}</span>
-                <span className="shrink-0">{formatPrice(item.price)}</span>
               </div>
             ))}
           </div>
@@ -135,10 +132,6 @@ export function GrandTotalDisplay({
         <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
           <span>Services Total</span>
           <span>{formatPrice(packageTotal)}</span>
-        </div>
-        <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
-          <span>Album Total</span>
-          <span>{formatPrice(albumTotal)}</span>
         </div>
         <div className="flex flex-col gap-2 border-t border-primary/15 pt-4 text-lg sm:flex-row sm:items-center sm:justify-between">
           <span className="font-semibold text-foreground">Grand Total</span>

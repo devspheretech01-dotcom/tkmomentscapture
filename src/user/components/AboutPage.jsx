@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Camera, Clapperboard, Heart, MapPin } from "lucide-react";
+import { Camera, Clapperboard, FileText, Heart, MapPin } from "lucide-react";
 
 const values = [
   {
@@ -57,9 +57,20 @@ const testimonials = [
 ];
 
 const highlights = [
-  { value: "500+", label: "Wedding stories" },
-  { value: "12+", label: "Years of craft" },
+  { value: "800+", label: "Wedding stories" },
+  { value: "10+", label: "Years of craft" },
   { value: "98%", label: "Happy couples" },
+];
+
+const termsConditions = [
+  "If any electronic item gets defective, TK Moments Capture will not be responsible for damage such as camera, memory card, hard disk, or similar storage/media issues.",
+  "For order confirmation, an advance payment of 10K is required. If you cancel the order, the advance payment will not be refundable.",
+  "70% payment must be made as soon as the wedding is over. The receipt will be provided, and the remaining payment must be submitted after handover of your data.",
+  "You must visit the office for photo selection after the marriage. The earlier you come, the earlier your data can be prepared and delivered.",
+  "Changes in album and photos can be requested only one time. Additional change requests will be chargeable.",
+  "The couple must give proper time to the photographer for portrait photography.",
+  "Transportation is included between Ankleshwar and Bharuch up to 40 km. If the location is more than 40 km from Ankleshwar-Bharuch, transportation charges will apply.",
+  "Disrespect, abuse, or misbehavior toward any TK Moments Capture team member will not be tolerated.",
 ];
 
 export default function AboutPage() {
@@ -142,6 +153,27 @@ export default function AboutPage() {
               <li key={item}>{item}</li>
             ))}
           </ul>
+        </div>
+      </section>
+
+      <section className="about-page-terms" aria-labelledby="about-terms-title">
+        <div className="about-terms-heading">
+          <span className="about-page-kicker">Terms & Conditions</span>
+          <h2 id="about-terms-title">Clear commitments before every booking.</h2>
+          <p>
+            Please read these booking terms carefully so expectations, payments,
+            delivery, and conduct stay clear from the beginning.
+          </p>
+        </div>
+
+        <div className="about-terms-list">
+          {termsConditions.map((term, index) => (
+            <article className="about-term" key={term}>
+              <span className="about-term-number">{String(index + 1).padStart(2, "0")}</span>
+              <FileText size={20} strokeWidth={1.5} aria-hidden="true" />
+              <p>{term}</p>
+            </article>
+          ))}
         </div>
       </section>
 

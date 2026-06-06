@@ -1,8 +1,6 @@
 import { BookOpen, Check, HardDrive, Image, Play, Video } from 'lucide-react'
 import { Button } from '@user/components/ui/button'
 import { Input } from '@user/components/ui/input'
-import { Separator } from '@user/components/ui/separator'
-import { formatPrice } from '@user/services/package-data'
 
 export const ALBUM_ADDONS = [
   {
@@ -87,7 +85,7 @@ export function getAlbumLineItems(albumSelection, addonServices = ALBUM_ADDONS) 
     selectedAddons.push({
       id: 'editedPhotos',
       serviceId: editedPhotoService?.backendId || editedPhotoService?.id || 'editedPhotos',
-      name: `Edited Photos (${editedPhotos} x ${formatPrice(EDITED_PHOTO_PRICE)})`,
+      name: `Edited Photos (${editedPhotos})`,
       price: editedPhotoService?.price
         ? editedPhotos * editedPhotoService.price
         : editedPhotos * EDITED_PHOTO_PRICE,
@@ -105,7 +103,6 @@ export function calculateAlbumTotal(albumSelection, addonServices) {
 
 export function AlbumSection({ albumSelection, addonServices, onChange, onBack, onContinue }) {
   const visibleAddons = addonServices?.length ? addonServices : ALBUM_ADDONS
-  const albumTotal = calculateAlbumTotal(albumSelection, visibleAddons)
 
   const handleToggle = (id) => {
     onChange({
@@ -135,7 +132,6 @@ export function AlbumSection({ albumSelection, addonServices, onChange, onBack, 
         {visibleAddons.map((addon) => {
           const Icon = typeof addon.icon === 'string' ? iconMap[addon.icon] || BookOpen : addon.icon
           const selected = albumSelection[addon.id]
-          const price = addon.price || addon.pricePerDay || 0
 
           return (
             <button
@@ -153,7 +149,6 @@ export function AlbumSection({ albumSelection, addonServices, onChange, onBack, 
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block break-words text-sm font-medium">{addon.name}</span>
-                <span className="block text-xs text-muted-foreground">{formatPrice(price)}</span>
               </span>
               <span
                 className={`grid size-5 shrink-0 place-items-center rounded-full border ${
@@ -180,18 +175,6 @@ export function AlbumSection({ albumSelection, addonServices, onChange, onBack, 
             onChange={handleEditedPhotosChange}
             className="bg-background sm:max-w-36"
           />
-          <p className="text-sm text-muted-foreground">
-            {formatPrice(EDITED_PHOTO_PRICE)} per photo
-          </p>
-        </div>
-      </div>
-
-      <Separator />
-
-      <div className="rounded-lg bg-primary/5 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-sm font-semibold text-foreground">Album Total</span>
-          <span className="text-xl font-bold text-primary">{formatPrice(albumTotal)}</span>
         </div>
       </div>
 
