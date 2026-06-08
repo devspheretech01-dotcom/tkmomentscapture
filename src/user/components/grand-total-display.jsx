@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@user/components/ui/button'
 import { Separator } from '@user/components/ui/separator'
-import { formatPrice, calculateGrandTotal } from '@user/services/package-data'
-import { calculateAlbumTotal, getAlbumLineItems } from '@user/components/album-section'
+import { formatPrice } from '@user/services/package-data'
+import { getAlbumLineItems } from '@user/components/album-section'
 import { createBooking } from '@user/services/api'
 import { buildBookingPayload } from '@user/services/booking-payload'
 import { Check, Mail, Phone, User } from 'lucide-react'
@@ -17,13 +17,55 @@ export function GrandTotalDisplay({
   onBack,
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const packageTotal = calculateGrandTotal(events, services)
-  const albumTotal = calculateAlbumTotal(albumSelection, addonServices?.length ? addonServices : undefined)
-  const grandTotal = packageTotal + albumTotal
+  const [estimate, setEstimate] = useState(null)
+  const [subtotal, setSubtotal] = useState(null)
+  const [isCalculatingEstimate, setIsCalculatingEstimate] = useState(false)
+
   const albumLineItems = getAlbumLineItems(albumSelection, addonServices?.length ? addonServices : undefined)
   const eventsWithServices = events.filter((e) => e.selectedServices.length > 0)
 
+  const fetchEstimate = async () => {
+    // Backend calculates totals using DB service prices + profit
+    const payload = buildBookingPayload({
+      events,
+      services,
+      albumSelection,
+      addonServices,
+      customerDetails: customerDetails || {},
+      isConfirmed: false,
+    })
+
+    setIsCalculatingEstimate(true)
+    try {
+      const response = await fetch(`${(import.meta.env.VITE_API_URL || "").replace(/\/$/, "")}/api/bookings/estimate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ events: payload.events, addons: payload.addons }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || "Unable to calculate estimate")
+      }
+
+      setSubtotal(data.subtotal ?? null)
+      setEstimate(data.estimate ?? null)
+    } catch (err) {
+      setSubtotal(null)
+      setEstimate(null)
+      alert(err.message || "Unable to calculate estimate")
+    } finally {
+      setIsCalculatingEstimate(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchEstimate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, services, albumSelection, addonServices])
+
   const handleConfirm = async () => {
+
     const payload = buildBookingPayload({
       events,
       services,
@@ -44,6 +86,7 @@ export function GrandTotalDisplay({
       alert(`${data.message || 'Booking created'}${data.booking?.bookingId ? `: ${data.booking.bookingId}` : ''}`)
       onConfirm()
     } catch (error) {
+
       alert(error.message || 'Unable to create booking')
     } finally {
       setIsSubmitting(false)
@@ -129,20 +172,23 @@ export function GrandTotalDisplay({
 
       {/* Grand Total */}
       <div className="space-y-4 rounded-lg border border-primary/15 bg-primary/5 p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
+        {/* <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
           <span>Services Total</span>
-          <span>{formatPrice(packageTotal)}</span>
-        </div>
-        <div className="flex flex-col gap-2 border-t border-primary/15 pt-4 text-lg sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            {isCalculatingEstimate ? '...' : subtotal != null ? formatPrice(subtotal) : '--'}
+          </span>
+        </div> */}
+        <div className="flex flex-col gap-2 border-primary/15 pt-4 text-lg sm:flex-row sm:items-center sm:justify-between">
           <span className="font-semibold text-foreground">Grand Total</span>
           <span className="text-2xl font-bold text-primary">
-            {formatPrice(grandTotal)}
+            {isCalculatingEstimate ? '...' : estimate != null ? formatPrice(estimate) : '--'}
           </span>
         </div>
-        <p className="text-xs text-muted-foreground">
-          This is the total cost for your complete wedding photography package
-        </p>
+        {/* <p className="text-xs text-muted-foreground">
+          Total is calculated from backend (DB service prices + profit).
+        </p> */}
       </div>
+
 
       <Separator className="my-7" />
 
