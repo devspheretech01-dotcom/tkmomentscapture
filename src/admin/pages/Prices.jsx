@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { useCreateService, useDeleteService, useGetPackages, useGetRoleSources, useUpdateService } from "@admin/services/api";
-import { ADD_NEW_ROLE_VALUE, getRoleLabel, getRoleOptions, normalizeRoleValue } from "@admin/services/roles";
+import { useCreateService, useDeleteService, useGetPackages, useUpdateService } from "@admin/services/api";
+import { normalizeRoleValue } from "@admin/services/roles";
 import { useSettings } from "@admin/services/SettingsContext";
 import { formatCurrency } from "@shared/utils/admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@admin/components/ui/card";
@@ -18,7 +18,7 @@ function ServiceRow({ item, onDelete, onEdit, columns }) {
     <TableRow>
       {columns.map((col) => (
         <TableCell key={col.key}>
-          {col.type === "number" ? formatCurrency(item[col.key], settings.currency) : col.key === "role" ? getRoleLabel(item.role) : item[col.key] || "-"}
+          {col.type === "number" ? formatCurrency(item[col.key], settings.currency) : item[col.key] || "-"}
         </TableCell>
       ))}
       <TableCell className="text-right">
@@ -35,8 +35,6 @@ function ServiceRow({ item, onDelete, onEdit, columns }) {
 
 export default function Prices() {
   const { data: apiServices = [], isLoading } = useGetPackages();
-  const roleSources = useGetRoleSources();
-  const roleOptions = useMemo(() => getRoleOptions(roleSources), [roleSources.photographers, roleSources.services]);
   const createService = useCreateService();
   const updateService = useUpdateService();
   const deleteService = useDeleteService();
@@ -46,8 +44,26 @@ export default function Prices() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [priceTypeFilter, setPriceTypeFilter] = useState("all");
   const [sort, setSort] = useState("name");
-  const [newService, setNewService] = useState({ name: "", type: "addon", priceType: "per_day", role: roleOptions[0]?.value || "", newRole: "", price: "" });
+  const [newService, setNewService] = useState({ name: "", type: "addon", priceType: "fixed", price: "" });
   const [editingService, setEditingService] = useState(null);
+  const priceTypeOptions = (type) => type === "shoot"
+    ? [{ value: "per_day", label: "Per day" }]
+    : [
+      { value: "fixed", label: "Fixed" },
+      { value: "per_unit", label: "Per unit" },
+    ];
+  const getValidPriceType = (type, priceType) => (
+    priceTypeOptions(type).some((option) => option.value === priceType)
+      ? priceType
+      : priceTypeOptions(type)[0].value
+  );
+  const buildServicePayload = (service) => ({
+    name: service.name,
+    type: service.type,
+    priceType: getValidPriceType(service.type, service.priceType),
+    role: normalizeRoleValue(service.name),
+    price: Number(service.price),
+  });
 
   const allServices = apiServices;
   const services = allServices.filter((service) => {
@@ -55,8 +71,7 @@ export default function Prices() {
     const matchSearch = !query ||
       service.name?.toLowerCase().includes(query) ||
       service.type?.toLowerCase().includes(query) ||
-      service.priceType?.toLowerCase().includes(query) ||
-      service.role?.toLowerCase().includes(query);
+      service.priceType?.toLowerCase().includes(query);
     const matchType = typeFilter === "all" || service.type === typeFilter;
     const matchPriceType = priceTypeFilter === "all" || service.priceType === priceTypeFilter;
     return matchSearch && matchType && matchPriceType;
@@ -69,22 +84,15 @@ export default function Prices() {
 
   const handleAddNew = (e) => {
     e.preventDefault();
-    const role = newService.role === ADD_NEW_ROLE_VALUE ? normalizeRoleValue(newService.newRole) : newService.role;
-    if (!role) {
-      toast({ title: "Role required", description: "Select a role or add a new one." });
+    if (!normalizeRoleValue(newService.name)) {
+      toast({ title: "Service name required", description: "Enter a valid service name." });
       return;
     }
 
-    const payload = {
-      name: newService.name,
-      type: newService.type,
-      priceType: newService.priceType,
-      role,
-      price: Number(newService.price),
-    };
+    const payload = buildServicePayload(newService);
     createService.mutate(payload, {
       onSuccess: () => {
-        setNewService({ name: "", type: "addon", priceType: "per_day", role, newRole: "", price: "" });
+        setNewService({ name: "", type: "addon", priceType: "fixed", price: "" });
         toast({ title: "Service Created", description: "The service has been added." });
       },
       onError: (err) => toast({ title: "Create failed", description: err.message }),
@@ -104,9 +112,7 @@ export default function Prices() {
       id: service.id,
       name: service.name || "",
       type: service.type || "addon",
-      priceType: service.priceType || "per_day",
-      role: service.role || roleOptions[0]?.value || "",
-      newRole: "",
+      priceType: getValidPriceType(service.type || "addon", service.priceType || "fixed"),
       price: service.price ?? "",
     });
   };
@@ -117,21 +123,14 @@ export default function Prices() {
     e.preventDefault();
     if (!editingService) return;
 
-    const role = editingService.role === ADD_NEW_ROLE_VALUE ? normalizeRoleValue(editingService.newRole) : editingService.role;
-    if (!role) {
-      toast({ title: "Role required", description: "Select a role or add a new one." });
+    if (!normalizeRoleValue(editingService.name)) {
+      toast({ title: "Service name required", description: "Enter a valid service name." });
       return;
     }
 
     updateService.mutate({
       id: editingService.id,
-      data: {
-        name: editingService.name,
-        type: editingService.type,
-        role,
-        priceType: editingService.priceType,
-        price: Number(editingService.price),
-      },
+      data: buildServicePayload(editingService),
     }, {
       onSuccess: () => {
         setEditingService(null);
@@ -144,7 +143,6 @@ export default function Prices() {
   const serviceColumns = [
     { key: "name", label: "Name" },
     { key: "type", label: "Type" },
-    { key: "role", label: "Role" },
     { key: "priceType", label: "Price Type" },
     { key: "price", label: "Price", type: "number" },
   ];
@@ -158,26 +156,22 @@ export default function Prices() {
         </div>
       </div>
 
-      <form onSubmit={handleAddNew} className="grid grid-cols-1 gap-3 rounded-2xl border border-border/60 bg-card p-4 shadow-sm md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_auto]">
+      <form onSubmit={handleAddNew} className="grid grid-cols-1 gap-3 rounded-2xl border border-border/60 bg-card p-4 shadow-sm md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_auto]">
         <Input value={newService.name} onChange={(e) => setNewService({ ...newService, name: e.target.value })} placeholder="500gb hard-drive" required />
-        <select value={newService.type} onChange={(e) => setNewService({ ...newService, type: e.target.value })} className="h-10 rounded-xl border border-border bg-card px-3 text-sm">
+        <select
+          value={newService.type}
+          onChange={(e) => {
+            const type = e.target.value;
+            setNewService({ ...newService, type, priceType: getValidPriceType(type, newService.priceType) });
+          }}
+          className="h-10 rounded-xl border border-border bg-card px-3 text-sm"
+        >
           <option value="addon">Addon</option>
           <option value="shoot">Shoot</option>
         </select>
         <select value={newService.priceType} onChange={(e) => setNewService({ ...newService, priceType: e.target.value })} className="h-10 rounded-xl border border-border bg-card px-3 text-sm">
-          <option value="per_day">Per day</option>
-          <option value="fixed">Fixed</option>
-          <option value="per_unit">Per unit</option>
+          {priceTypeOptions(newService.type).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
-        <select value={newService.role} onChange={(e) => setNewService({ ...newService, role: e.target.value })} required className="h-10 rounded-xl border border-border bg-card px-3 text-sm">
-          {roleOptions.map((role) => (
-            <option key={role.value} value={role.value}>{role.label}</option>
-          ))}
-          <option value={ADD_NEW_ROLE_VALUE}>Add new role</option>
-        </select>
-        {newService.role === ADD_NEW_ROLE_VALUE && (
-          <Input value={newService.newRole} onChange={(e) => setNewService({ ...newService, newRole: e.target.value })} placeholder="semi candid photographer" required />
-        )}
         <Input type="number" value={newService.price} onChange={(e) => setNewService({ ...newService, price: e.target.value })} placeholder="6000" required />
         <Button type="submit" disabled={createService.isPending} className="bg-primary hover:bg-primary/90">
           <Plus className="h-4 w-4" /> Create
@@ -185,26 +179,22 @@ export default function Prices() {
       </form>
 
       {editingService && (
-        <form onSubmit={handleUpdateService} className="grid grid-cols-1 gap-3 rounded-2xl border border-primary/20 bg-card p-4 shadow-sm md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_auto_auto]">
+        <form onSubmit={handleUpdateService} className="grid grid-cols-1 gap-3 rounded-2xl border border-primary/20 bg-card p-4 shadow-sm md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_auto_auto]">
           <Input value={editingService.name} onChange={(e) => setEditingService({ ...editingService, name: e.target.value })} placeholder="Service name" required />
-          <select value={editingService.type} onChange={(e) => setEditingService({ ...editingService, type: e.target.value })} className="h-10 rounded-xl border border-border bg-card px-3 text-sm">
+          <select
+            value={editingService.type}
+            onChange={(e) => {
+              const type = e.target.value;
+              setEditingService({ ...editingService, type, priceType: getValidPriceType(type, editingService.priceType) });
+            }}
+            className="h-10 rounded-xl border border-border bg-card px-3 text-sm"
+          >
             <option value="addon">Addon</option>
             <option value="shoot">Shoot</option>
           </select>
           <select value={editingService.priceType} onChange={(e) => setEditingService({ ...editingService, priceType: e.target.value })} className="h-10 rounded-xl border border-border bg-card px-3 text-sm">
-            <option value="per_day">Per day</option>
-            <option value="fixed">Fixed</option>
-            <option value="per_unit">Per unit</option>
+            {priceTypeOptions(editingService.type).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
-          <select value={editingService.role} onChange={(e) => setEditingService({ ...editingService, role: e.target.value })} required className="h-10 rounded-xl border border-border bg-card px-3 text-sm">
-            {roleOptions.map((role) => (
-              <option key={role.value} value={role.value}>{role.label}</option>
-            ))}
-            <option value={ADD_NEW_ROLE_VALUE}>Add new role</option>
-          </select>
-          {editingService.role === ADD_NEW_ROLE_VALUE && (
-            <Input value={editingService.newRole} onChange={(e) => setEditingService({ ...editingService, newRole: e.target.value })} placeholder="semi candid photographer" required />
-          )}
           <Input type="number" value={editingService.price} onChange={(e) => setEditingService({ ...editingService, price: e.target.value })} placeholder="6000" required />
           <Button type="submit" disabled={updateService.isPending} className="bg-primary hover:bg-primary/90">
             <Save className="h-4 w-4" /> {updateService.isPending ? "Saving..." : "Save"}
@@ -263,13 +253,12 @@ export default function Prices() {
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="font-semibold text-foreground text-sm truncate">{service.name}</p>
-                        <p className="text-xs text-muted-foreground">{service.type} - {getRoleLabel(service.role)} - {service.priceType}</p>
+                        <p className="text-xs text-muted-foreground">{service.type} - {service.priceType}</p>
                       </div>
                       <span className="text-sm font-semibold text-foreground">{formatCurrency(service.price, settings.currency)}</span>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-muted-foreground">
                       <span className="rounded-full bg-slate-50 dark:bg-slate-900/50 px-2 py-1">Type: {service.type}</span>
-                      <span className="rounded-full bg-slate-50 dark:bg-slate-900/50 px-2 py-1">Role: {getRoleLabel(service.role)}</span>
                       <span className="rounded-full bg-slate-50 dark:bg-slate-900/50 px-2 py-1">Price type: {service.priceType}</span>
                       <button onClick={() => startEditService(service)} className="ml-auto rounded-lg px-2 py-1 font-semibold text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-900">Edit</button>
                       <button onClick={() => handleDeleteService(service.id)} className="rounded-lg px-2 py-1 font-semibold text-red-600 hover:bg-red-50">Delete</button>

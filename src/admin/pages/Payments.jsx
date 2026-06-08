@@ -62,8 +62,6 @@ const getPaymentSearchText = (payment) => {
     payment.totalAmount,
     payment.advancePaid,
     payment.remainingAmount,
-    payment.extraPaid,
-    payment.carryForward,
     getTransactionsText(payment),
   ].filter(Boolean).join(" ").toLowerCase();
 };
@@ -80,10 +78,9 @@ export default function Payments() {
   const [form, setForm] = useState({
     photographerId: "",
     month: monthValue(),
-    amountPaid: "",
+    paymentDate: new Date().toISOString().slice(0, 10),
     transactionId: "",
     paymentMethod: "upi",
-    type: "advance",
     note: "",
   });
 
@@ -101,6 +98,15 @@ export default function Payments() {
   const filterMonths = mode === "month" ? allBookedMonths : getBookedMonths(selectedFilterPhotographer);
   const expectedDays = selectedPaymentPhotographer?.bookedDates?.filter((date) => String(date).startsWith(form.month)).length || 0;
   const expectedTotal = expectedDays * (selectedPaymentPhotographer?.perDayRate || 0);
+  const existingPaymentForForm = allPayments.find((payment) => {
+    const photographer = getPhotographer(payment);
+    return form.photographerId && form.month &&
+      (getPhotographerId(photographer) === form.photographerId || getPhotographerId(payment.photographerId) === form.photographerId) &&
+      payment.month === form.month;
+  });
+  const payableAmount = existingPaymentForForm
+    ? Math.max(existingPaymentForForm.remainingAmount || 0, 0)
+    : expectedTotal;
 
   const sourcePayments = mode === "unpaid"
     ? unpaidPayments
@@ -121,7 +127,6 @@ export default function Payments() {
       if (sort === "total_high") return (b.totalAmount || 0) - (a.totalAmount || 0);
       if (sort === "paid_high") return (b.advancePaid || 0) - (a.advancePaid || 0);
       if (sort === "remaining_high") return (b.remainingAmount || 0) - (a.remainingAmount || 0);
-      if (sort === "extra_high") return (b.extraPaid || 0) - (a.extraPaid || 0);
       return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
     });
   }, [sourcePayments, search, sort]);
@@ -140,26 +145,31 @@ export default function Payments() {
       return;
     }
 
-    const amountPaid = Number(form.amountPaid);
-    if (!amountPaid || amountPaid <= 0) {
-      toast({ title: "Invalid amount", description: "Enter an amount greater than 0." });
+    if (!form.paymentDate) {
+      toast({ title: "Payment date required", description: "Select the actual payment date." });
       return;
     }
 
-    if (!window.confirm(`Add ${formatCurrency(amountPaid, settings.currency)} payment for ${form.month}?`)) return;
+    if (!payableAmount || payableAmount <= 0) {
+      toast({ title: "Nothing to pay", description: "No payable amount found for this booked month." });
+      return;
+    }
+
+    if (!window.confirm(`Pay ${formatCurrency(payableAmount, settings.currency)} for booked month ${form.month}?`)) return;
 
     updatePayment.mutate({
       photographerId: form.photographerId,
       month: form.month,
-      amountPaid,
+      amountPaid: payableAmount,
       transactionId: form.transactionId.trim(),
       paymentMethod: form.paymentMethod,
-      type: form.type,
-      note: form.note.trim(),
+      type: "remaining",
+      paymentDate: form.paymentDate,
+      note: [`Payment date: ${form.paymentDate}`, form.note.trim()].filter(Boolean).join(" | "),
     }, {
       onSuccess: () => {
-        toast({ title: "Payment Updated", description: "Transaction saved and monthly totals recalculated." });
-        setForm({ ...form, amountPaid: "", transactionId: "", note: "" });
+        toast({ title: "Payment Updated", description: "Booked month total was paid and monthly totals recalculated." });
+        setForm({ ...form, transactionId: "", note: "" });
       },
       onError: (err) => toast({ title: "Payment failed", description: err.message }),
     });
@@ -184,8 +194,8 @@ export default function Payments() {
             </select>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Manual Month</label>
-            <Input type="month" value={form.month} onChange={(e) => setForm({ ...form, month: e.target.value })} required />
+            <label className="text-xs font-medium text-muted-foreground">Payment Date</label>
+            <Input type="date" value={form.paymentDate} onChange={(e) => setForm({ ...form, paymentDate: e.target.value })} required />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Booked Month</label>
@@ -201,10 +211,10 @@ export default function Payments() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.75fr)_minmax(0,0.75fr)]">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.75fr)]">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Amount Paid</label>
-            <Input type="number" min="1" value={form.amountPaid} onChange={(e) => setForm({ ...form, amountPaid: e.target.value })} placeholder="9000" required />
+            <label className="text-xs font-medium text-muted-foreground">Payable Amount</label>
+            <Input value={formatCurrency(payableAmount || 0, settings.currency)} readOnly className="font-semibold" />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Transaction ID</label>
@@ -216,13 +226,6 @@ export default function Payments() {
               <option value="upi">UPI</option>
               <option value="cash">Cash</option>
               <option value="bank">Bank</option>
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Type</label>
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm">
-              <option value="advance">Advance</option>
-              <option value="remaining">Remaining</option>
             </select>
           </div>
         </div>
@@ -243,7 +246,7 @@ export default function Payments() {
             <span>Current rate: <b>{formatCurrency(selectedPaymentPhotographer.perDayRate || 0, settings.currency)}</b></span>
             <span>{form.month} days: <b>{expectedDays}</b></span>
             <span>Expected total: <b>{formatCurrency(expectedTotal, settings.currency)}</b></span>
-            <span>Overpay allowed: extra carries forward</span>
+            <span>Pay now: <b>{formatCurrency(payableAmount || 0, settings.currency)}</b></span>
           </div>
         )}
       </form>
@@ -299,7 +302,6 @@ export default function Payments() {
             <option value="total_high">Total High</option>
             <option value="paid_high">Paid High</option>
             <option value="remaining_high">Remaining High</option>
-            <option value="extra_high">Extra High</option>
           </select>
         </div>
       </div>
@@ -314,10 +316,8 @@ export default function Payments() {
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">Days</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">Rate</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">Total</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">Carry</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">Paid</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">Remaining</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">Extra</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">History</th>
               </tr>
@@ -325,11 +325,11 @@ export default function Payments() {
             <tbody className="divide-y divide-border/60">
               {loading ? (
                 Array(5).fill(0).map((_, i) => (
-                  <tr key={i}><td colSpan={11} className="px-5 py-4"><Skeleton className="h-8 w-full" /></td></tr>
+                  <tr key={i}><td colSpan={9} className="px-5 py-4"><Skeleton className="h-8 w-full" /></td></tr>
                 ))
               ) : !payments.length ? (
                 <tr>
-                  <td colSpan={11} className="py-14 text-center text-sm text-muted-foreground">
+                  <td colSpan={9} className="py-14 text-center text-sm text-muted-foreground">
                     <CreditCard className="mx-auto mb-3 h-8 w-8 text-slate-300" />
                     No payment records found.
                   </td>
@@ -346,10 +346,8 @@ export default function Payments() {
                     <td className="px-4 py-4 text-right">{payment.totalDays || 0}</td>
                     <td className="px-4 py-4 text-right">{formatCurrency(payment.perDayRate || 0, settings.currency)}</td>
                     <td className="px-4 py-4 text-right font-semibold">{formatCurrency(payment.totalAmount || 0, settings.currency)}</td>
-                    <td className="px-4 py-4 text-right">{formatCurrency(payment.carryForward || 0, settings.currency)}</td>
                     <td className="px-4 py-4 text-right">{formatCurrency(payment.advancePaid || 0, settings.currency)}</td>
                     <td className="px-4 py-4 text-right">{formatCurrency(payment.remainingAmount || 0, settings.currency)}</td>
-                    <td className="px-4 py-4 text-right">{formatCurrency(payment.extraPaid || 0, settings.currency)}</td>
                     <td className="px-4 py-4 text-center">
                       <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase ${STATUS_STYLE[payment.status] || STATUS_STYLE.pending}`}>{payment.status || "pending"}</span>
                     </td>
@@ -379,8 +377,6 @@ export default function Payments() {
               <div className="grid gap-3 rounded-xl border border-border bg-slate-50 p-4 text-sm dark:bg-slate-900/40 sm:grid-cols-3">
                 <span>Total: <b>{formatCurrency(selectedPayment.totalAmount || 0, settings.currency)}</b></span>
                 <span>Remaining: <b>{formatCurrency(selectedPayment.remainingAmount || 0, settings.currency)}</b></span>
-                <span>Extra: <b>{formatCurrency(selectedPayment.extraPaid || 0, settings.currency)}</b></span>
-                <span>Carry forward: <b>{formatCurrency(selectedPayment.carryForward || 0, settings.currency)}</b></span>
                 <span>Locked rate: <b>{formatCurrency(selectedPayment.perDayRate || 0, settings.currency)}</b></span>
                 <span>Working days: <b>{selectedPayment.totalDays || 0}</b></span>
               </div>

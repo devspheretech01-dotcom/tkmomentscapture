@@ -11,7 +11,8 @@ import {
   useGetAvailablePhotographers,
   useAssignPhotographer,
   useConvertInquiryToBooking,
-  useDeleteBooking
+  useDeleteBooking,
+  useUpdateDataHandover
 } from "@admin/services/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@admin/components/ui/skeleton";
@@ -20,7 +21,7 @@ import { format } from "date-fns";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@admin/components/ui/dialog";
 import { Button } from "@admin/components/ui/button";
-import { MapPin, Mail, Phone, Calendar, ChevronLeft, CheckCircle, User, Lock, AlertCircle, Trash2, Wallet , ArrowLeft} from "lucide-react";
+import { MapPin, Mail, Phone, Calendar, ChevronLeft, CheckCircle, User, Lock, AlertCircle, Trash2, Wallet, ArrowLeft, Camera, HardDrive, XCircle } from "lucide-react";
 import { useToast } from "@shared/hooks/use-toast";
 
 const STATUS_CONFIG = {
@@ -60,7 +61,7 @@ const getRoleFromServiceName = (name = "") => {
 };
 const getServiceRole = (item) => {
   const service = getService(item);
-  return (typeof service === "object" ? service.role : "") || getRoleFromServiceName(getServiceName(item));
+  return getRoleFromServiceName(getServiceName(item)) || (typeof service === "object" ? service.role : "");
 };
 const getEventRequiredRoles = (event) => {
   const roles = event.services?.map(getServiceRole).filter(Boolean) || [];
@@ -92,6 +93,9 @@ const getPhotoRole = (photo, allPhotographers) => {
   return allPhotographers.find((item) => item.id === id || item._id === id)?.role || "";
 };
 const getAssignedIdsForDay = (booking, day) => getAssignedPhotoRefs(booking, day).map(getPhotoId).filter(Boolean);
+const getAssignedPhotosByRole = (booking, day, role, allPhotographers) => (
+  getAssignedPhotoRefs(booking, day).filter((photo) => getPhotoRole(photo, allPhotographers) === role)
+);
 const getAssignedRoleCount = (booking, day, role, allPhotographers) => (
   getAssignedPhotoRefs(booking, day).filter((photo) => getPhotoRole(photo, allPhotographers) === role).length
 );
@@ -129,6 +133,21 @@ const getMergedAssignments = (current = [], day, photographer) => {
   if (!dayFound) assigned.push({ day, photographerIds: [photographer] });
   return assigned;
 };
+const getUniqueAssignedPhotographers = (booking) => {
+  const map = new Map();
+  (booking.assigned || []).forEach((assign) => {
+    const photographers = assign.photographerIds || assign.photographerId || [];
+    (Array.isArray(photographers) ? photographers : [photographers]).forEach((photo) => {
+      const id = getPhotoId(photo);
+      if (id && !map.has(id)) map.set(id, photo);
+    });
+  });
+  return [...map.values()];
+};
+const getHandoverEntry = (booking, photographerId) => (
+  booking.dataHandover?.find((item) => getPhotoId(item.photographerId) === photographerId)
+);
+const DRIVE_TYPES = ["A", "B", "C", "D"];
 
 const getPhotographerConflict = (photo, selectedDay, booking) => {
   if (!photo.isActive) return "Photographer is inactive";
@@ -136,6 +155,9 @@ const getPhotographerConflict = (photo, selectedDay, booking) => {
 
   return "";
 };
+const getAvailableCountForRole = (photographers, role, event) => (
+  photographers.filter((photo) => photo.role === role && !getPhotographerConflict(photo, event, {})).length
+);
 
 export default function BookingDetail() {
   const { settings } = useSettings();
@@ -150,6 +172,7 @@ export default function BookingDetail() {
   const assignPhotographer = useAssignPhotographer();
   const convertInquiry = useConvertInquiryToBooking();
   const deleteBooking = useDeleteBooking();
+  const updateDataHandover = useUpdateDataHandover();
   const { data: allPhotographers = [] } = useGetPhotographers();
 
   const [selectedDay, setSelectedDay] = useState(null);
@@ -158,6 +181,7 @@ export default function BookingDetail() {
   const [draftAssigned, setDraftAssigned] = useState([]);
   const [workStatus, setWorkStatus] = useState("");
   const [paymentForm, setPaymentForm] = useState({ amount: "", transactionId: "", paymentMethod: "upi", note: "" });
+  const [handoverForms, setHandoverForms] = useState({});
 
   const { data: availability, isLoading: isAvailabilityLoading } = useGetAvailablePhotographers(
     { date: selectedDay?.date, role: selectedCategory },
@@ -213,6 +237,7 @@ export default function BookingDetail() {
     };
   }) : [];
   const categoryPhotographers = selectedCategory ? availablePhotographers.filter((photo) => photo.role === selectedCategory) : [];
+  const assignedPhotographers = getUniqueAssignedPhotographers(booking);
   const requiredPhotographerCount = booking.events?.reduce((sum, event) => (
     sum + getEventRoleNeeds(event).reduce((total, need) => total + need.count, 0)
   ), 0) || 0;
@@ -272,17 +297,45 @@ export default function BookingDetail() {
   };
 
   const handleDeleteBooking = () => {
-    if (booking.type !== "enquiry" && booking.status !== "cancelled") {
-      toast({ title: "Delete not allowed", description: "Only enquiries or cancelled bookings can be deleted." });
+    if (booking.type !== "enquiry" && !["cancelled", "pending"].includes(booking.status)) {
+      toast({ title: "Delete not allowed", description: "Only pending or cancelled bookings can be deleted." });
       return;
     }
     if (!window.confirm("Are you sure you want to delete this record?")) return;
+    if (booking.status === "pending" && booking.type !== "enquiry") {
+      updateBooking.mutate({ id, data: { status: "cancelled" } }, {
+        onSuccess: () => {
+          deleteBooking.mutate(id, {
+            onSuccess: () => {
+              toast({ title: "Deleted", description: "Booking record deleted successfully." });
+              window.location.href = "/admin/bookings";
+            },
+            onError: (err) => toast({ title: "Delete failed", description: err.message }),
+          });
+        },
+        onError: (err) => toast({ title: "Cancel failed", description: err.message }),
+      });
+      return;
+    }
     deleteBooking.mutate(id, {
       onSuccess: () => {
         toast({ title: "Deleted", description: "Booking record deleted successfully." });
         window.location.href = booking.type === "enquiry" ? "/admin/inquiries" : "/admin/bookings";
       },
       onError: (err) => toast({ title: "Delete failed", description: err.message }),
+    });
+  };
+
+  const handleCancelBooking = () => {
+    if (booking.status !== "pending") return;
+    if (!window.confirm("Cancel this pending booking?")) return;
+    updateBooking.mutate({ id, data: { status: "cancelled" } }, {
+      onSuccess: () => {
+        toast({ title: "Booking cancelled", description: "This booking can now be deleted if needed." });
+        queryClient.invalidateQueries({ queryKey: getGetBookingQueryKey(id) });
+        queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
+      },
+      onError: (err) => toast({ title: "Cancel failed", description: err.message }),
     });
   };
 
@@ -313,6 +366,41 @@ export default function BookingDetail() {
     });
   };
 
+  const handleHandoverChange = (photographerId, key, value) => {
+    setHandoverForms((current) => ({
+      ...current,
+      [photographerId]: {
+        driveType: "A",
+        receivedBy: "",
+        note: "",
+        ...(current[photographerId] || {}),
+        [key]: value,
+      },
+    }));
+  };
+
+  const handleDataHandoverSubmit = (event, photographerId) => {
+    event.preventDefault();
+    const form = handoverForms[photographerId] || {};
+    const payload = {
+      photographerId,
+      driveType: form.driveType || "A",
+      receivedBy: form.receivedBy || "",
+      note: form.note || "",
+    };
+    if (!payload.receivedBy.trim()) {
+      toast({ title: "Receiver required", description: "Enter who received the drive." });
+      return;
+    }
+    updateDataHandover.mutate({ id, data: payload }, {
+      onSuccess: () => {
+        toast({ title: "Data handover saved", description: `Drive ${payload.driveType} marked as received.` });
+        setHandoverForms((current) => ({ ...current, [photographerId]: { driveType: "A", receivedBy: "", note: "" } }));
+      },
+      onError: (err) => toast({ title: "Handover failed", description: err.message }),
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -335,7 +423,12 @@ export default function BookingDetail() {
               <CheckCircle className="h-4 w-4" /> Confirm Request
             </button>
           )}
-          {(booking.type === "enquiry" || booking.status === "cancelled") && (
+          {status === "pending" && (
+            <button onClick={handleCancelBooking} disabled={updateBooking.isPending} className="inline-flex items-center gap-2 rounded-xl border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700 transition-all hover:bg-amber-50 disabled:opacity-60">
+              <XCircle className="h-4 w-4" /> Cancel
+            </button>
+          )}
+          {(booking.type === "enquiry" || ["pending", "cancelled"].includes(booking.status)) && (
             <button onClick={handleDeleteBooking} disabled={deleteBooking.isPending} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60 transition-all">
               <Trash2 className="h-4 w-4" /> {deleteBooking.isPending ? "Deleting..." : "Delete"}
             </button>
@@ -377,6 +470,8 @@ export default function BookingDetail() {
                 const assigned = getAssignedPhotographer(draftBooking, event.day);
                 const requiredRoles = getEventRequiredRoles(event);
                 const assignedIds = getAssignedIdsForDay(draftBooking, event.day);
+                const requiredCount = event.services?.length || 0;
+                const isEventFilled = requiredCount > 0 && assignedIds.length >= requiredCount;
                 return (
                   <div key={event.day} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-border">
                     <div className="flex-1">
@@ -394,6 +489,38 @@ export default function BookingDetail() {
                           <span className="text-[11px] text-amber-600">No service role found</span>
                         )}
                       </div>
+                      <div className="ml-8 mt-3 space-y-1.5">
+                        {event.services?.map((item, index) => {
+                          const role = getServiceRole(item);
+                          const photos = role ? getAssignedPhotosByRole(draftBooking, event.day, role, allPhotographers) : [];
+                          const hasAvailable = role ? getAvailableCountForRole(allPhotographers, role, event) > 0 : true;
+                          return (
+                            <div key={`${event.day}-service-assign-${index}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-white px-2.5 py-2 text-xs text-slate-600 ring-1 ring-slate-100 dark:bg-card dark:text-muted-foreground dark:ring-border">
+                              <span className="font-medium text-slate-800 dark:text-foreground">{getServiceName(item)}</span>
+                              {role && (
+                                <>
+                                  <span className="text-slate-300">|</span>
+                                  <span>{getRoleLabel(role)}</span>
+                                </>
+                              )}
+                              <span className="text-slate-300">|</span>
+                              {photos.length ? (
+                                <span className="inline-flex items-center gap-1 font-semibold text-primary">
+                                  <User className="h-3 w-3" /> {photos.map((photo) => photo?.name || getPhotoId(photo)).join(", ")}
+                                </span>
+                              ) : (
+                                <span className="font-medium text-slate-400">Not assigned</span>
+                              )}
+                              {!hasAvailable && (
+                                <>
+                                  <span className="text-slate-300">|</span>
+                                  <span className="font-semibold text-red-600">Not available</span>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                       {assigned && (
                         <div className="ml-8 mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-full">
                           <User className="h-3 w-3" /> {assigned.photographerName || getAssignedNames(assigned)}
@@ -404,15 +531,15 @@ export default function BookingDetail() {
                       </p>
                     </div>
                     <button
-                      disabled={!!assigned}
+                      disabled={isEventFilled}
                       onClick={() => {
-                        if (assigned) return;
+                        if (isEventFilled) return;
                         setSelectedCategory(null);
                         setSelectedDay(selectedDay?.day === event.day ? null : event);
                       }}
-                      className={`shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${assigned ? "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400 dark:border-border/60 dark:bg-slate-800 dark:text-slate-500" : "bg-primary text-white hover:bg-primary/90"}`}
+                      className={`shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${isEventFilled ? "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400 dark:border-border/60 dark:bg-slate-800 dark:text-slate-500" : "bg-primary text-white hover:bg-primary/90"}`}
                     >
-                      {assigned ? "Assigned" : "Assign Photographer"}
+                      {isEventFilled ? "Assigned" : "Assign Photographer"}
                     </button>
                   </div>
                 );
@@ -465,7 +592,7 @@ export default function BookingDetail() {
                             <Icon className="h-5 w-5" />
                           </div>
                           <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${hasAvailable ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "bg-red-50 text-red-700 ring-1 ring-red-200"}`}>
-                            {hasAvailable ? `${category.available} active` : "Booked"}
+                            {hasAvailable ? `${category.available} available` : "Not available"}
                           </span>
                         </div>
                         <p className="mt-3 text-sm font-bold text-slate-900 dark:text-foreground">{category.label}</p>
@@ -504,6 +631,7 @@ export default function BookingDetail() {
                         const need = selectedDayNeeds.find((item) => item.role === selectedCategory);
                         const isRoleFilled = getAssignedRoleCount(draftBooking, selectedDay.day, selectedCategory, allPhotographers) >= (need?.count || 1);
                         const isUnavailable = !!conflict || isAlreadyAssigned || isRoleFilled;
+                        const unavailableText = conflict ? "Not available" : isAlreadyAssigned ? "Already assigned to this day" : "Required count selected";
                         return (
                           <div key={photo.id} className={`flex items-center gap-3 p-3.5 border rounded-xl transition-all ${isUnavailable ? "border-slate-200 dark:border-border/60 bg-slate-50/80 dark:bg-slate-900/40 opacity-60" : "border-slate-200 dark:border-border/60 bg-white dark:bg-card hover:border-primary/20"}`}>
                             {photo.avatar ? (
@@ -521,7 +649,7 @@ export default function BookingDetail() {
                               <p className="text-xs text-slate-400 dark:text-muted-foreground/70 truncate">{getRoleLabel(photo.role)} - {photo.city}</p>
                               {isUnavailable && (
                                 <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
-                                  <AlertCircle className="h-3 w-3 shrink-0" /> {isAlreadyAssigned ? "Already assigned to this day" : isRoleFilled ? "Required count selected" : conflict}
+                                  <AlertCircle className="h-3 w-3 shrink-0" /> {unavailableText}
                                 </p>
                               )}
                             </div>
@@ -530,7 +658,7 @@ export default function BookingDetail() {
                               disabled={isUnavailable}
                               className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${isUnavailable ? "cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-500" : "bg-primary hover:bg-primary/90 text-white"}`}
                             >
-                              {isAlreadyAssigned ? "Assigned" : isRoleFilled ? "Filled" : isUnavailable ? "Booked" : "Assign"}
+                              {isAlreadyAssigned ? "Assigned" : isRoleFilled ? "Filled" : conflict ? "Not available" : "Assign"}
                             </button>
                           </div>
                         );
@@ -541,6 +669,116 @@ export default function BookingDetail() {
               )}
             </div>
           )}
+
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm dark:border-border dark:bg-card">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-foreground">Data Handover</h3>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-muted-foreground">Assigned photographers and drive receiving status.</p>
+              </div>
+              <HardDrive className="h-5 w-5 text-primary" />
+            </div>
+
+            {!assignedPhotographers.length ? (
+              <div className="rounded-xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500 dark:border-border dark:text-muted-foreground">
+                Assign photographers before adding data handover.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-[760px] w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-border dark:bg-slate-900/30 dark:text-muted-foreground">
+                      <th className="px-3 py-3 text-left font-semibold">Photographer</th>
+                      <th className="px-3 py-3 text-left font-semibold">Handover Status</th>
+                      <th className="px-3 py-3 text-left font-semibold">Drive</th>
+                      <th className="px-3 py-3 text-left font-semibold">Received By</th>
+                      <th className="px-3 py-3 text-left font-semibold">Note</th>
+                      <th className="px-3 py-3 text-right font-semibold">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 dark:divide-border/60">
+                    {assignedPhotographers.map((photo) => {
+                      const photographerId = getPhotoId(photo);
+                      const entry = getHandoverEntry(booking, photographerId);
+                      const form = handoverForms[photographerId] || { driveType: "A", receivedBy: "", note: "" };
+                      const submittedDriveTypes = entry?.drives?.map((drive) => drive.driveType) || [];
+                      return (
+                        <tr key={photographerId} className="align-top">
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-2">
+                              {photo?.avatar ? (
+                                <img src={photo.avatar} alt={photo.name} className="h-9 w-9 rounded-lg object-cover" />
+                              ) : (
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                                  {(photo?.name || "?").slice(0, 2).toUpperCase()}
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-semibold text-slate-900 dark:text-foreground">{photo?.name || photographerId}</p>
+                                <p className="text-xs text-slate-400 dark:text-muted-foreground">{getRoleLabel(photo?.role)}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            {entry?.drives?.length ? (
+                              <div className="space-y-1.5">
+                                {entry.drives.map((drive) => (
+                                  <div key={`${photographerId}-${drive.driveType}`} className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-700 ring-1 ring-emerald-200">
+                                    <p className="font-semibold">Drive {drive.driveType} received by {drive.receivedBy || "-"}</p>
+                                    <p className="mt-0.5 text-emerald-600">{formatDateValue(drive.handedOverDate)}{drive.note ? ` | ${drive.note}` : ""}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-200">
+                                Data not handover
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            <select
+                              value={form.driveType}
+                              onChange={(e) => handleHandoverChange(photographerId, "driveType", e.target.value)}
+                              className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-primary/30 dark:border-border dark:bg-card dark:text-foreground"
+                            >
+                              {DRIVE_TYPES.map((drive) => (
+                                <option key={drive} value={drive} disabled={submittedDriveTypes.includes(drive)}>Drive {drive}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-3">
+                            <input
+                              value={form.receivedBy}
+                              onChange={(e) => handleHandoverChange(photographerId, "receivedBy", e.target.value)}
+                              className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-primary/30 dark:border-border dark:bg-card dark:text-foreground"
+                              placeholder="Receiver name"
+                            />
+                          </td>
+                          <td className="px-3 py-3">
+                            <input
+                              value={form.note}
+                              onChange={(e) => handleHandoverChange(photographerId, "note", e.target.value)}
+                              className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-primary/30 dark:border-border dark:bg-card dark:text-foreground"
+                              placeholder="Optional note"
+                            />
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            <button
+                              onClick={(event) => handleDataHandoverSubmit(event, photographerId)}
+                              disabled={updateDataHandover.isPending || submittedDriveTypes.includes(form.driveType)}
+                              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 disabled:opacity-50"
+                            >
+                              <HardDrive className="h-3.5 w-3.5" /> Save
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="space-y-5">

@@ -4,7 +4,7 @@ import { useGetPhotographers } from "@admin/services/api";
 import { getRoleConfig, getRoleLabel } from "@admin/services/roles";
 import { Input } from "@admin/components/ui/input";
 import { Skeleton } from "@admin/components/ui/skeleton";
-import { Search, Plus, MapPin, Camera, Phone, Mail } from "lucide-react";
+import { Search, Plus, MapPin, Camera, Phone, Mail, CalendarDays } from "lucide-react";
 
 const STATUS_CONFIG = {
   active: { label: "Active", cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200", dot: "bg-emerald-500" },
@@ -15,15 +15,20 @@ export default function Photographers() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("");
+  const [dateAvailabilityFilter, setDateAvailabilityFilter] = useState("all");
   const [sort, setSort] = useState("name");
   const navigate = useNavigate();
   const { data: apiPhotographers = [], isLoading } = useGetPhotographers();
 
   const base = apiPhotographers;
+  const isAvailableOnDate = (p) => p.isActive && (!dateFilter || !p.bookedDates?.includes(dateFilter));
+  const availableOnDateCount = dateFilter ? base.filter(isAvailableOnDate).length : 0;
+  const unavailableOnDateCount = dateFilter ? base.length - availableOnDateCount : 0;
   const categoryStats = [...new Set(base.map((p) => p.role).filter(Boolean))].sort((a, b) => getRoleLabel(a).localeCompare(getRoleLabel(b))).map((role) => {
     const config = getRoleConfig(role);
     const rolePhotographers = base.filter((p) => p.role === role);
-    const available = rolePhotographers.filter((p) => p.isActive).length;
+    const available = rolePhotographers.filter((p) => dateFilter ? isAvailableOnDate(p) : p.isActive).length;
     return { role, ...config, total: rolePhotographers.length, available };
   });
   const photographers = base.filter((p) => {
@@ -39,7 +44,9 @@ export default function Photographers() {
     const currentStatus = p.isActive ? "active" : "inactive";
     const matchStatus = statusFilter === "all" || currentStatus === statusFilter;
     const matchCategory = categoryFilter === "all" || p.role === categoryFilter;
-    return matchSearch && matchStatus && matchCategory;
+    const matchDateAvailability = !dateFilter || dateAvailabilityFilter === "all" ||
+      (dateAvailabilityFilter === "available" ? isAvailableOnDate(p) : !isAvailableOnDate(p));
+    return matchSearch && matchStatus && matchCategory && matchDateAvailability;
   }).sort((a, b) => {
     if (sort === "city") return (a.city || "").localeCompare(b.city || "");
     if (sort === "role") return getRoleLabel(a.role).localeCompare(getRoleLabel(b.role));
@@ -96,6 +103,27 @@ export default function Photographers() {
         </select>
       </div>
 
+      <div className="grid gap-3 rounded-2xl border border-border/60 bg-card p-4 shadow-sm md:grid-cols-[minmax(0,0.8fr)_auto_auto] md:items-end">
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <CalendarDays className="h-3.5 w-3.5" /> Check by date
+          </label>
+          <Input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="h-9" />
+        </div>
+        <select value={dateAvailabilityFilter} onChange={(e) => setDateAvailabilityFilter(e.target.value)} disabled={!dateFilter} className="h-9 rounded-xl border border-border bg-card px-3 text-sm shadow-sm disabled:opacity-60">
+          <option value="all">All on date</option>
+          <option value="available">Available only</option>
+          <option value="unavailable">Unavailable only</option>
+        </select>
+        <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-900/40 dark:text-muted-foreground">
+          {dateFilter ? (
+            <span><b className="text-emerald-700">{availableOnDateCount}</b> available, <b className="text-red-600">{unavailableOnDateCount}</b> unavailable</span>
+          ) : (
+            <span>Select a date to check availability</span>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
         {categoryStats.map((category) => {
           const Icon = category.icon;
@@ -135,7 +163,8 @@ export default function Photographers() {
         <>
           <div className="grid grid-cols-2 gap-3 md:hidden">
             {photographers.map((p) => {
-              const dot = p.isActive ? "bg-emerald-500" : "bg-slate-400";
+              const dateUnavailable = dateFilter && !isAvailableOnDate(p);
+              const dot = dateUnavailable ? "bg-red-500" : p.isActive ? "bg-emerald-500" : "bg-slate-400";
               return (
                 <Link
                   key={p.id}
@@ -151,7 +180,7 @@ export default function Photographers() {
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-foreground">{p.name}</p>
-                    <p className="truncate text-[11px] text-slate-500 dark:text-muted-foreground">{getRoleLabel(p.role)}</p>
+                    <p className="truncate text-[11px] text-slate-500 dark:text-muted-foreground">{getRoleLabel(p.role)}{dateUnavailable ? " - Not available" : ""}</p>
                   </div>
                   <span className={`h-3.5 w-3.5 rounded-full ${dot} ring-1 ring-white/80 shadow-sm`} />
                 </Link>
@@ -161,7 +190,8 @@ export default function Photographers() {
 
           <div className="hidden md:grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {photographers.map((p) => {
-              const sc = p.isActive ? STATUS_CONFIG.active : STATUS_CONFIG.inactive;
+              const dateUnavailable = dateFilter && !isAvailableOnDate(p);
+              const sc = dateUnavailable ? { label: "Not available", cls: "bg-red-50 text-red-700 ring-1 ring-red-200", dot: "bg-red-500" } : p.isActive ? STATUS_CONFIG.active : STATUS_CONFIG.inactive;
               return (
                 <div key={p.id} className="bg-white dark:bg-card rounded-2xl border border-slate-100 dark:border-border/60 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
                   <div className="p-5">

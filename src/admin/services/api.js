@@ -98,6 +98,29 @@ export function useUpdateBooking() {
   });
 }
 
+export function useGetProfit() {
+  return useQuery({
+    queryKey: ["admin", "profit"],
+    queryFn: async () => {
+      const data = await request("/admin/profit");
+      return data.setting;
+    },
+  });
+}
+
+export function useUpdateProfit() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => request("/admin/profit", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "profit"] });
+    },
+  });
+}
+
 export function useDeleteBooking() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -112,6 +135,20 @@ export function useDeleteBooking() {
 }
 
 export const useDeleteInquiry = useDeleteBooking;
+
+export function useUpdateDataHandover() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => request(`/bookings/booking/${id}/handover`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: getGetBookingQueryKey(variables.id) });
+      queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
+    },
+  });
+}
 
 export function useUpdateWorkStatus() {
   const queryClient = useQueryClient();

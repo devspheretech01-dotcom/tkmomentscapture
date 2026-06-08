@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@admin/components/ui/toaster";
 import { TooltipProvider } from "@admin/components/ui/tooltip";
+import ErrorReturnBoundary from "@admin/components/ErrorReturnBoundary";
 import { AuthProvider, useAuth } from "@admin/services/auth";
 import { SettingsProvider } from "@admin/services/SettingsContext";
 import AdminLayout from "@admin/layouts/AdminLayout";
@@ -61,7 +62,9 @@ export default function AdminRoutes() {
         <TooltipProvider>
           <AuthProvider>
             <div className="admin-app">
-              <AdminRouteTree />
+              <ErrorReturnBoundary>
+                <AdminRouteTree />
+              </ErrorReturnBoundary>
             </div>
           </AuthProvider>
           <Toaster />
