@@ -5,6 +5,7 @@ import {
   useGetBooking,
   getGetBookingQueryKey,
   useUpdateBooking,
+  useUpdateBookingPrice,
   useUpdateWorkStatus,
   useUpdateClientPayment,
   useGetPhotographers,
@@ -167,6 +168,7 @@ export default function BookingDetail() {
   const queryClient = useQueryClient();
   const { data: apiBooking, isLoading } = useGetBooking(id, { query: { enabled: !!id } });
   const updateBooking = useUpdateBooking();
+  const updateBookingPrice = useUpdateBookingPrice();
   const updateWorkStatus = useUpdateWorkStatus();
   const updateClientPayment = useUpdateClientPayment();
   const assignPhotographer = useAssignPhotographer();
@@ -181,6 +183,7 @@ export default function BookingDetail() {
   const [draftAssigned, setDraftAssigned] = useState([]);
   const [workStatus, setWorkStatus] = useState("");
   const [paymentForm, setPaymentForm] = useState({ amount: "", transactionId: "", paymentMethod: "upi", note: "" });
+  const [discountPercentage, setDiscountPercentage] = useState("");
   const [handoverForms, setHandoverForms] = useState({});
 
   const { data: availability, isLoading: isAvailabilityLoading } = useGetAvailablePhotographers(
@@ -190,7 +193,10 @@ export default function BookingDetail() {
 
   const booking = apiBooking;
   useEffect(() => {
-    if (apiBooking) setDraftAssigned(getNormalizedAssignments(apiBooking.assigned || []));
+    if (apiBooking) {
+      setDraftAssigned(getNormalizedAssignments(apiBooking.assigned || []));
+      setDiscountPercentage(String(apiBooking.discountPercentage ?? 0));
+    }
   }, [apiBooking]);
 
   if (isLoading) {
@@ -238,6 +244,9 @@ export default function BookingDetail() {
   }) : [];
   const categoryPhotographers = selectedCategory ? availablePhotographers.filter((photo) => photo.role === selectedCategory) : [];
   const assignedPhotographers = getUniqueAssignedPhotographers(booking);
+  const hasDiscount = Number(booking.discountPercentage || 0) > 0;
+  const baseEstimate = booking.estimate || ((booking.subtotal || 0) + (booking.profitAmount || 0));
+  const displayTotal = hasDiscount ? booking.finalAmount : (booking.payment?.totalAmount || baseEstimate);
   const requiredPhotographerCount = booking.events?.reduce((sum, event) => (
     sum + getEventRoleNeeds(event).reduce((total, need) => total + need.count, 0)
   ), 0) || 0;
@@ -363,6 +372,19 @@ export default function BookingDetail() {
       },
     }, {
       onSuccess: () => setPaymentForm({ amount: "", transactionId: "", paymentMethod: "upi", note: "" })
+    });
+  };
+
+  const handleDiscountSubmit = (e) => {
+    e.preventDefault();
+    const discount = Number(discountPercentage);
+    if (Number.isNaN(discount) || discount < 0 || discount > 100) {
+      toast({ title: "Invalid discount", description: "Discount percentage must be between 0 and 100." });
+      return;
+    }
+    updateBookingPrice.mutate({ id, data: { discountPercentage: discount } }, {
+      onSuccess: () => toast({ title: "Discount updated", description: "Booking price has been recalculated." }),
+      onError: (err) => toast({ title: "Discount failed", description: err.message }),
     });
   };
 
@@ -692,7 +714,7 @@ export default function BookingDetail() {
                   const submittedDriveTypes = entry?.drives?.map((drive) => drive.driveType) || [];
                   return (
                     <div key={photographerId} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-border dark:bg-slate-900/20">
-                      <div className="grid gap-4 lg:grid-cols-[minmax(190px,0.9fr)_minmax(220px,1fr)]">
+                      <div className="grid gap-4 xl:grid-cols-[minmax(240px,0.75fr)_minmax(0,1.25fr)]">
                         <div className="min-w-0">
                           <div className="flex items-center gap-3">
                             {photo?.avatar ? (
@@ -726,8 +748,9 @@ export default function BookingDetail() {
                           </div>
                         </div>
 
-                        <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)] xl:grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)_auto]">
-                          <label className="space-y-1">
+                        <div className="space-y-3">
+                          <div className="grid gap-3 sm:grid-cols-3">
+                            <label className="space-y-1">
                             <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-muted-foreground">Drive</span>
                             <select
                               value={form.driveType}
@@ -748,7 +771,7 @@ export default function BookingDetail() {
                               placeholder="Receiver name"
                             />
                           </label>
-                          <label className="space-y-1 sm:col-span-2 xl:col-span-1">
+                          <label className="space-y-1">
                             <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-muted-foreground">Note</span>
                             <input
                               value={form.note}
@@ -757,11 +780,12 @@ export default function BookingDetail() {
                               placeholder="Optional note"
                             />
                           </label>
-                          <div className="flex items-end sm:col-span-2 xl:col-span-1">
+                          </div>
+                          <div className="flex justify-end">
                             <button
                               onClick={(event) => handleDataHandoverSubmit(event, photographerId)}
                               disabled={updateDataHandover.isPending || submittedDriveTypes.includes(form.driveType)}
-                              className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 xl:w-auto"
+                              className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                             >
                               <HardDrive className="h-4 w-4" /> Save
                             </button>
@@ -898,10 +922,47 @@ export default function BookingDetail() {
                   </div>
                 </div>
               )}
-              <div className="pt-3 mt-3 border-t border-slate-100 dark:border-border flex justify-between items-center">
-                <span className="text-sm font-semibold text-slate-900 dark:text-foreground">Total</span>
-                <span className="text-xl font-bold text-slate-900 dark:text-foreground">{formatCurrency(booking.estimate || booking.totalPrice || 0, settings.currency)}</span>
-              </div>
+              <form onSubmit={handleDiscountSubmit} className="mt-3 space-y-3 border-t border-slate-100 pt-3 dark:border-border">
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-slate-500 dark:text-muted-foreground">Estimate</span>
+                    <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(baseEstimate || 0, settings.currency)}</span>
+                  </div>
+                  {hasDiscount && (
+                    <div className="flex items-center justify-between gap-3 text-emerald-700 dark:text-emerald-300">
+                      <span>Discount ({booking.discountPercentage}%)</span>
+                      <span className="font-semibold">-{formatCurrency(booking.discountAmount || 0, settings.currency)}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={discountPercentage}
+                    onChange={(e) => setDiscountPercentage(e.target.value)}
+                    disabled={booking.status === "confirmed"}
+                    placeholder="Discount %"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:bg-slate-100 disabled:text-slate-400 dark:border-border dark:bg-card dark:text-foreground"
+                  />
+                  <button
+                    type="submit"
+                    disabled={updateBookingPrice.isPending || booking.status === "confirmed"}
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {updateBookingPrice.isPending ? "Saving" : "Apply"}
+                  </button>
+                </div>
+                {booking.status === "confirmed" && (
+                  <p className="text-xs text-slate-400 dark:text-muted-foreground/70">Discount is locked after booking confirmation.</p>
+                )}
+                <div className="flex justify-between items-center border-t border-slate-100 pt-3 dark:border-border">
+                  <span className="text-sm font-semibold text-slate-900 dark:text-foreground">Total</span>
+                  <span className="text-xl font-bold text-slate-900 dark:text-foreground">{formatCurrency(displayTotal || 0, settings.currency)}</span>
+                </div>
+              </form>
             </div>
           </div>
 

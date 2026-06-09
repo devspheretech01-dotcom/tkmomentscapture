@@ -98,6 +98,21 @@ export function useUpdateBooking() {
   });
 }
 
+export function useUpdateBookingPrice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => request(`/bookings/booking/${id}/update-price`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
+      queryClient.invalidateQueries({ queryKey: getGetBookingQueryKey(variables.id) });
+      queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+    },
+  });
+}
+
 export function useGetProfit() {
   return useQuery({
     queryKey: ["admin", "profit"],
