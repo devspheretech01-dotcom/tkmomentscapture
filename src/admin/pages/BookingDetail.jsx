@@ -684,98 +684,93 @@ export default function BookingDetail() {
                 Assign photographers before adding data handover.
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-[760px] w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-border dark:bg-slate-900/30 dark:text-muted-foreground">
-                      <th className="px-3 py-3 text-left font-semibold">Photographer</th>
-                      <th className="px-3 py-3 text-left font-semibold">Handover Status</th>
-                      <th className="px-3 py-3 text-left font-semibold">Drive</th>
-                      <th className="px-3 py-3 text-left font-semibold">Received By</th>
-                      <th className="px-3 py-3 text-left font-semibold">Note</th>
-                      <th className="px-3 py-3 text-right font-semibold">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50 dark:divide-border/60">
-                    {assignedPhotographers.map((photo) => {
-                      const photographerId = getPhotoId(photo);
-                      const entry = getHandoverEntry(booking, photographerId);
-                      const form = handoverForms[photographerId] || { driveType: "A", receivedBy: "", note: "" };
-                      const submittedDriveTypes = entry?.drives?.map((drive) => drive.driveType) || [];
-                      return (
-                        <tr key={photographerId} className="align-top">
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-2">
-                              {photo?.avatar ? (
-                                <img src={photo.avatar} alt={photo.name} className="h-9 w-9 rounded-lg object-cover" />
-                              ) : (
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
-                                  {(photo?.name || "?").slice(0, 2).toUpperCase()}
-                                </div>
-                              )}
-                              <div>
-                                <p className="font-semibold text-slate-900 dark:text-foreground">{photo?.name || photographerId}</p>
-                                <p className="text-xs text-slate-400 dark:text-muted-foreground">{getRoleLabel(photo?.role)}</p>
+              <div className="space-y-3">
+                {assignedPhotographers.map((photo) => {
+                  const photographerId = getPhotoId(photo);
+                  const entry = getHandoverEntry(booking, photographerId);
+                  const form = handoverForms[photographerId] || { driveType: "A", receivedBy: "", note: "" };
+                  const submittedDriveTypes = entry?.drives?.map((drive) => drive.driveType) || [];
+                  return (
+                    <div key={photographerId} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-border dark:bg-slate-900/20">
+                      <div className="grid gap-4 lg:grid-cols-[minmax(190px,0.9fr)_minmax(220px,1fr)]">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-3">
+                            {photo?.avatar ? (
+                              <img src={photo.avatar} alt={photo.name} className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+                            ) : (
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                                {(photo?.name || "?").slice(0, 2).toUpperCase()}
                               </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-900 dark:text-foreground">{photo?.name || photographerId}</p>
+                              <p className="truncate text-xs text-slate-400 dark:text-muted-foreground">{getRoleLabel(photo?.role)}</p>
                             </div>
-                          </td>
-                          <td className="px-3 py-3">
+                          </div>
+
+                          <div className="mt-3">
                             {entry?.drives?.length ? (
-                              <div className="space-y-1.5">
+                              <div className="space-y-2">
                                 {entry.drives.map((drive) => (
-                                  <div key={`${photographerId}-${drive.driveType}`} className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-700 ring-1 ring-emerald-200">
+                                  <div key={`${photographerId}-${drive.driveType}`} className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/60">
                                     <p className="font-semibold">Drive {drive.driveType} received by {drive.receivedBy || "-"}</p>
-                                    <p className="mt-0.5 text-emerald-600">{formatDateValue(drive.handedOverDate)}{drive.note ? ` | ${drive.note}` : ""}</p>
+                                    <p className="mt-0.5 text-emerald-600 dark:text-emerald-400">{formatDateValue(drive.handedOverDate)}{drive.note ? ` | ${drive.note}` : ""}</p>
                                   </div>
                                 ))}
                               </div>
                             ) : (
-                              <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-200">
+                              <span className="inline-flex rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200 dark:bg-red-950/30 dark:text-red-300 dark:ring-red-900/60">
                                 Data not handover
                               </span>
                             )}
-                          </td>
-                          <td className="px-3 py-3">
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)] xl:grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)_auto]">
+                          <label className="space-y-1">
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-muted-foreground">Drive</span>
                             <select
                               value={form.driveType}
                               onChange={(e) => handleHandoverChange(photographerId, "driveType", e.target.value)}
-                              className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-primary/30 dark:border-border dark:bg-card dark:text-foreground"
+                              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-border dark:bg-card dark:text-foreground"
                             >
                               {DRIVE_TYPES.map((drive) => (
                                 <option key={drive} value={drive} disabled={submittedDriveTypes.includes(drive)}>Drive {drive}</option>
                               ))}
                             </select>
-                          </td>
-                          <td className="px-3 py-3">
+                          </label>
+                          <label className="space-y-1">
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-muted-foreground">Received By</span>
                             <input
                               value={form.receivedBy}
                               onChange={(e) => handleHandoverChange(photographerId, "receivedBy", e.target.value)}
-                              className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-primary/30 dark:border-border dark:bg-card dark:text-foreground"
+                              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-border dark:bg-card dark:text-foreground"
                               placeholder="Receiver name"
                             />
-                          </td>
-                          <td className="px-3 py-3">
+                          </label>
+                          <label className="space-y-1 sm:col-span-2 xl:col-span-1">
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-muted-foreground">Note</span>
                             <input
                               value={form.note}
                               onChange={(e) => handleHandoverChange(photographerId, "note", e.target.value)}
-                              className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-primary/30 dark:border-border dark:bg-card dark:text-foreground"
+                              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-border dark:bg-card dark:text-foreground"
                               placeholder="Optional note"
                             />
-                          </td>
-                          <td className="px-3 py-3 text-right">
+                          </label>
+                          <div className="flex items-end sm:col-span-2 xl:col-span-1">
                             <button
                               onClick={(event) => handleDataHandoverSubmit(event, photographerId)}
                               disabled={updateDataHandover.isPending || submittedDriveTypes.includes(form.driveType)}
-                              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 disabled:opacity-50"
+                              className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 xl:w-auto"
                             >
-                              <HardDrive className="h-3.5 w-3.5" /> Save
+                              <HardDrive className="h-4 w-4" /> Save
                             </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

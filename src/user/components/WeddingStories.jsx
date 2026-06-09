@@ -112,12 +112,12 @@ function StoryRow({ title, stories }) {
           <span>{title.split(" ")[0]}</span> {title.split(" ").slice(1).join(" ")}
         </h2>
         <div className="wedding-stories-controls" aria-hidden="true">
-          <button type="button" aria-label="Previous stories">
+          {/* <button type="button" aria-label="Previous stories">
             <ChevronLeft size={18} strokeWidth={1.2} />
           </button>
           <button type="button" aria-label="Next stories">
             <ChevronRight size={18} strokeWidth={1.2} />
-          </button>
+          </button> */}
         </div>
       </div>
 
