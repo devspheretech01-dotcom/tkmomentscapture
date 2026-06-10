@@ -32,6 +32,7 @@ const Header = ({ alwaysDark = false, onNavigate }) => {
         <a href="/" onClick={(event) => handleNavigate(event, 'home')}>Home</a>
         <a href="/wedding-stories" onClick={(event) => handleNavigate(event, 'wedding-stories')}>Wedding Stories</a>
         <a href="/wedding-films" onClick={(event) => handleNavigate(event, 'wedding-films')}>Wedding Films-shoot</a>
+        <a href="/prewedding" onClick={(event) => handleNavigate(event, 'prewedding')}>Pre-Wedding</a>
         <a href="/about" onClick={(event) => handleNavigate(event, 'about')}>About</a>
         <a href="/contact" onClick={(event) => handleNavigate(event, 'contact')}>Contact Us</a>
       </nav>

@@ -41,3 +41,18 @@ export function getRoleOptions({ photographers = [], services = [] } = {}) {
     .sort((a, b) => getRoleLabel(a).localeCompare(getRoleLabel(b)))
     .map((value) => ({ value, label: getRoleLabel(value) }));
 }
+
+export function getShootRoleOptions(services = []) {
+  const roles = new Map();
+
+  services
+    .filter((item) => item?.type === "shoot")
+    .forEach((item) => {
+      const value = item.role || normalizeRoleValue(item.name);
+      if (value) roles.set(value, item.name || getRoleLabel(value));
+    });
+
+  return [...roles.entries()]
+    .sort((a, b) => a[1].localeCompare(b[1]))
+    .map(([value, label]) => ({ value, label }));
+}

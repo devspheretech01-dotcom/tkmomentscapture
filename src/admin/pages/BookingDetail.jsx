@@ -39,12 +39,27 @@ const formatDateValue = (value, pattern = "MMM d, yyyy") => {
 };
 const formatDateTimeValue = (value) => formatDateValue(value, "MMM d, yyyy h:mm a");
 const getAssignedPhotographer = (booking, day) => booking.assigned?.find((item) => item.day === day);
-const getAssignedNames = (assigned) => {
-  const photographers = assigned?.photographerIds || assigned?.photographerId || [];
-  const list = Array.isArray(photographers) ? photographers : [photographers];
-  return list.map((photo) => photo?.name || photo?.id || photo?._id || photo).filter(Boolean).join(", ");
+const getAssignedNames = (assigned, allPhotographers = []) => {
+  const entries = Array.isArray(assigned?.assignments)
+    ? assigned.assignments.map((item) => item.photographerId)
+    : (Array.isArray(assigned?.photographerIds || assigned?.photographerId)
+      ? (assigned.photographerIds || assigned.photographerId)
+      : [assigned?.photographerIds || assigned?.photographerId]);
+
+  return entries
+    .map((photo) => {
+      if (photo?.name) return photo.name;
+      const id = getPhotoId(photo);
+      return allPhotographers.find((item) => item.id === id || item._id === id)?.name || id;
+    })
+    .filter(Boolean)
+    .join(", ");
 };
 const getService = (item) => item?.serviceId || item?.service || item;
+const getServiceId = (item) => {
+  const service = getService(item);
+  return service?._id || service?.id || (typeof service === "string" ? service : "") || item?.serviceId || item?.service || "";
+};
 const getServiceName = (item) => {
   const service = getService(item);
   return service?.name || service || "Service";
@@ -83,23 +98,28 @@ const getEventRoleNeeds = (event) => {
   return Object.values(needs);
 };
 const getPhotoId = (photo) => photo?._id || photo?.id || photo;
-const getAssignedPhotoRefs = (booking, day) => {
-  const assigned = getAssignedPhotographer(booking, day);
-  const photographers = assigned?.photographerIds || assigned?.photographerId || [];
-  return Array.isArray(photographers) ? photographers : [photographers];
-};
 const getPhotoRole = (photo, allPhotographers) => {
   if (photo?.role) return photo.role;
   const id = getPhotoId(photo);
   return allPhotographers.find((item) => item.id === id || item._id === id)?.role || "";
 };
-const getAssignedIdsForDay = (booking, day) => getAssignedPhotoRefs(booking, day).map(getPhotoId).filter(Boolean);
-const getAssignedPhotosByRole = (booking, day, role, allPhotographers) => (
-  getAssignedPhotoRefs(booking, day).filter((photo) => getPhotoRole(photo, allPhotographers) === role)
+const getAssignedIdsForDay = (booking, day) => getAssignedEntries(booking, day).map((item) => getPhotoId(item.photographerId)).filter(Boolean);
+const getAssignedPhotosForService = (booking, day, serviceItem, allPhotographers) => (
+  getAssignedEntries(booking, day)
+    .filter((assignment) => getServiceId(assignment.serviceId) === getServiceId(serviceItem))
+    .map((assignment) => getResolvedPhoto(assignment.photographerId, allPhotographers))
 );
-const getAssignedRoleCount = (booking, day, role, allPhotographers) => (
-  getAssignedPhotoRefs(booking, day).filter((photo) => getPhotoRole(photo, allPhotographers) === role).length
-);
+const getAssignedRoleCount = (booking, day, role, allPhotographers, event) => {
+  const entries = getAssignedEntries(booking, day);
+  if (event?.services?.length) {
+    const serviceRoles = new Map(event.services.map((item) => [getServiceId(item), getServiceRole(item)]));
+    return entries.filter((assignment) => serviceRoles.get(getServiceId(assignment.serviceId)) === role).length;
+  }
+
+  return entries
+    .map((item) => getResolvedPhoto(item.photographerId, allPhotographers))
+    .filter((photo) => getPhotoRole(photo, allPhotographers) === role).length;
+};
 const getServicePrice = (item) => {
   const service = getService(item);
   return typeof service === "object" ? service.price || 0 : 0;
@@ -108,16 +128,45 @@ const getServicePriceType = (item) => {
   const service = getService(item);
   return typeof service === "object" ? service.priceType : "";
 };
+const getAssignedEntries = (booking, day) => {
+  const assigned = getAssignedPhotographer(booking, day);
+  if (!assigned) return [];
+  if (Array.isArray(assigned.assignments)) return assigned.assignments;
+
+  const legacyPhotographers = assigned.photographerIds || assigned.photographerId || [];
+  return (Array.isArray(legacyPhotographers) ? legacyPhotographers : [legacyPhotographers])
+    .filter(Boolean)
+    .map((photographerId) => ({ photographerId, serviceId: "" }));
+};
+const getResolvedPhoto = (photo, allPhotographers) => {
+  if (photo?.name || photo?.role) return photo;
+  const id = getPhotoId(photo);
+  return allPhotographers.find((item) => item.id === id || item._id === id) || photo;
+};
 const getNormalizedAssignments = (assigned = []) => assigned.map((item) => ({
   day: item.day,
-  photographerIds: item.photographerIds || item.photographerId || [],
+  assignments: Array.isArray(item.assignments)
+    ? item.assignments.map((assignment) => ({
+      photographerId: assignment.photographerId,
+      serviceId: assignment.serviceId,
+    }))
+    : (Array.isArray(item.photographerIds || item.photographerId)
+      ? (item.photographerIds || item.photographerId)
+      : [item.photographerIds || item.photographerId]
+    ).filter(Boolean).map((photographerId) => ({ photographerId, serviceId: "" })),
 }));
 const getAssignmentPayload = (assigned = []) => assigned.map((item) => ({
   day: item.day,
-  photographerIds: (Array.isArray(item.photographerIds) ? item.photographerIds : [item.photographerIds]).map(getPhotoId).filter(Boolean),
+  assignments: (item.assignments || [])
+    .map((assignment) => ({
+      photographerId: getPhotoId(assignment.photographerId),
+      serviceId: getServiceId(assignment.serviceId),
+    }))
+    .filter((assignment) => assignment.photographerId && assignment.serviceId),
 }));
-const getMergedAssignments = (current = [], day, photographer) => {
+const getMergedAssignments = (current = [], day, serviceItem, photographer) => {
   const photoId = getPhotoId(photographer);
+  const serviceId = getServiceId(serviceItem);
   let dayFound = false;
 
   const assigned = current.map((item) => {
@@ -126,21 +175,36 @@ const getMergedAssignments = (current = [], day, photographer) => {
     }
 
     dayFound = true;
-    const photographers = Array.isArray(item.photographerIds) ? item.photographerIds : [item.photographerIds];
-    const exists = photographers.some((photo) => getPhotoId(photo) === photoId);
-    return { day, photographerIds: exists ? photographers : [...photographers, photographer] };
+    const assignments = item.assignments || [];
+    const exists = assignments.some((assignment) => getServiceId(assignment.serviceId) === serviceId);
+    return {
+      day,
+      assignments: exists
+        ? assignments.map((assignment) => (
+          getServiceId(assignment.serviceId) === serviceId
+            ? { photographerId: photographer, serviceId }
+            : assignment
+        ))
+        : [...assignments, { photographerId: photographer, serviceId }],
+    };
   });
 
-  if (!dayFound) assigned.push({ day, photographerIds: [photographer] });
+  if (!dayFound) assigned.push({ day, assignments: [{ photographerId: photographer, serviceId }] });
   return assigned;
 };
-const getUniqueAssignedPhotographers = (booking) => {
+const getUnassignedServiceForRole = (booking, event, role) => {
+  const assignedServiceIds = new Set(getAssignedEntries(booking, event.day).map((assignment) => getServiceId(assignment.serviceId)));
+  return event.services?.find((item) => getServiceRole(item) === role && !assignedServiceIds.has(getServiceId(item)));
+};
+const getUniqueAssignedPhotographers = (booking, allPhotographers = []) => {
   const map = new Map();
   (booking.assigned || []).forEach((assign) => {
-    const photographers = assign.photographerIds || assign.photographerId || [];
-    (Array.isArray(photographers) ? photographers : [photographers]).forEach((photo) => {
+    const entries = Array.isArray(assign.assignments)
+      ? assign.assignments.map((assignment) => assignment.photographerId)
+      : (Array.isArray(assign.photographerIds || assign.photographerId) ? (assign.photographerIds || assign.photographerId) : [assign.photographerIds || assign.photographerId]);
+    entries.forEach((photo) => {
       const id = getPhotoId(photo);
-      if (id && !map.has(id)) map.set(id, photo);
+      if (id && !map.has(id)) map.set(id, getResolvedPhoto(photo, allPhotographers));
     });
   });
   return [...map.values()];
@@ -228,7 +292,7 @@ export default function BookingDetail() {
   const categoryStats = selectedDay ? selectedDayRoles.map((role) => {
     const config = getRoleConfig(role);
     const need = selectedDayNeeds.find((item) => item.role === role);
-    const assignedCount = getAssignedRoleCount(draftBooking, selectedDay.day, role, allPhotographers);
+    const assignedCount = getAssignedRoleCount(draftBooking, selectedDay.day, role, allPhotographers, selectedDay);
     const photographers = availablePhotographers.filter((photo) => photo.role === role);
     const availableCount = photographers.filter((photo) => !getPhotographerConflict(photo, selectedDay, draftBooking)).length;
     return {
@@ -243,7 +307,7 @@ export default function BookingDetail() {
     };
   }) : [];
   const categoryPhotographers = selectedCategory ? availablePhotographers.filter((photo) => photo.role === selectedCategory) : [];
-  const assignedPhotographers = getUniqueAssignedPhotographers(booking);
+  const assignedPhotographers = getUniqueAssignedPhotographers(booking, allPhotographers);
   const hasDiscount = Number(booking.discountPercentage || 0) > 0;
   const baseEstimate = booking.estimate || ((booking.subtotal || 0) + (booking.profitAmount || 0));
   const displayTotal = hasDiscount ? booking.finalAmount : (booking.payment?.totalAmount || baseEstimate);
@@ -251,14 +315,19 @@ export default function BookingDetail() {
     sum + getEventRoleNeeds(event).reduce((total, need) => total + need.count, 0)
   ), 0) || 0;
   const selectedPhotographerCount = draftAssigned.reduce((sum, item) => {
-    const ids = Array.isArray(item.photographerIds) ? item.photographerIds : [item.photographerIds];
-    return sum + ids.filter(Boolean).length;
+    return sum + (item.assignments || []).filter((assignment) => getPhotoId(assignment.photographerId) && getServiceId(assignment.serviceId)).length;
   }, 0);
 
   const confirmAssignment = () => {
     if (!selectedDay || !assigningPhotographer) return;
     if (getPhotographerConflict(assigningPhotographer, selectedDay, draftBooking)) return;
-    setDraftAssigned((current) => getMergedAssignments(current, selectedDay.day, assigningPhotographer));
+    const serviceToAssign = getUnassignedServiceForRole(draftBooking, selectedDay, selectedCategory);
+    if (!serviceToAssign) {
+      toast({ title: "Role filled", description: "All services in this category already have photographers." });
+      setAssigningPhotographer(null);
+      return;
+    }
+    setDraftAssigned((current) => getMergedAssignments(current, selectedDay.day, serviceToAssign, assigningPhotographer));
     toast({ title: "Selected", description: "Photographer added to assignment draft." });
     setAssigningPhotographer(null);
   };
@@ -514,7 +583,7 @@ export default function BookingDetail() {
                       <div className="ml-8 mt-3 space-y-1.5">
                         {event.services?.map((item, index) => {
                           const role = getServiceRole(item);
-                          const photos = role ? getAssignedPhotosByRole(draftBooking, event.day, role, allPhotographers) : [];
+                          const photos = getAssignedPhotosForService(draftBooking, event.day, item, allPhotographers);
                           const hasAvailable = role ? getAvailableCountForRole(allPhotographers, role, event) > 0 : true;
                           return (
                             <div key={`${event.day}-service-assign-${index}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-white px-2.5 py-2 text-xs text-slate-600 ring-1 ring-slate-100 dark:bg-card dark:text-muted-foreground dark:ring-border">
@@ -545,7 +614,7 @@ export default function BookingDetail() {
                       </div>
                       {assigned && (
                         <div className="ml-8 mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-                          <User className="h-3 w-3" /> {assigned.photographerName || getAssignedNames(assigned)}
+                          <User className="h-3 w-3" /> {assigned.photographerName || getAssignedNames(assigned, allPhotographers)}
                         </div>
                       )}
                       <p className="ml-8 mt-2 text-[11px] text-slate-400 dark:text-muted-foreground/70">
@@ -651,7 +720,7 @@ export default function BookingDetail() {
                         const assignedIds = getAssignedIdsForDay(draftBooking, selectedDay.day);
                         const isAlreadyAssigned = assignedIds.includes(photo.id || photo._id);
                         const need = selectedDayNeeds.find((item) => item.role === selectedCategory);
-                        const isRoleFilled = getAssignedRoleCount(draftBooking, selectedDay.day, selectedCategory, allPhotographers) >= (need?.count || 1);
+                        const isRoleFilled = getAssignedRoleCount(draftBooking, selectedDay.day, selectedCategory, allPhotographers, selectedDay) >= (need?.count || 1);
                         const isUnavailable = !!conflict || isAlreadyAssigned || isRoleFilled;
                         const unavailableText = conflict ? "Not available" : isAlreadyAssigned ? "Already assigned to this day" : "Required count selected";
                         return (

@@ -4,20 +4,25 @@ import { Input } from "@admin/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@shared/hooks/use-toast";
 import { useCreatePhotographer, useGetRoleSources } from "@admin/services/api";
-import { ADD_NEW_ROLE_VALUE, getRoleOptions, normalizeRoleValue } from "@admin/services/roles";
+import { getShootRoleOptions } from "@admin/services/roles";
 import { ArrowLeft, Save } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function PhotographerNew() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const createPhotographer = useCreatePhotographer();
   const roleSources = useGetRoleSources();
-  const roleOptions = useMemo(() => getRoleOptions(roleSources), [roleSources.photographers, roleSources.services]);
+  const roleOptions = useMemo(() => getShootRoleOptions(roleSources.services), [roleSources.services]);
   const [selectedRole, setSelectedRole] = useState(roleOptions[0]?.value || "");
-  const [newRole, setNewRole] = useState("");
 
-  const currentRole = selectedRole === ADD_NEW_ROLE_VALUE ? normalizeRoleValue(newRole) : selectedRole;
+  useEffect(() => {
+    if (!selectedRole && roleOptions[0]?.value) {
+      setSelectedRole(roleOptions[0].value);
+    }
+  }, [roleOptions, selectedRole]);
+
+  const currentRole = selectedRole;
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -87,18 +92,12 @@ export default function PhotographerNew() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Role</label>
               <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} required className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm">
+                {!roleOptions.length && <option value="">No shoot services found</option>}
                 {roleOptions.map((role) => (
                   <option key={role.value} value={role.value}>{role.label}</option>
                 ))}
-                <option value={ADD_NEW_ROLE_VALUE}>Add new role</option>
               </select>
             </div>
-            {selectedRole === ADD_NEW_ROLE_VALUE && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">New Role</label>
-                <Input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="semi candid photographer" required />
-              </div>
-            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Avatar</label>
               <Input name="avatar" type="file" accept="image/*" />

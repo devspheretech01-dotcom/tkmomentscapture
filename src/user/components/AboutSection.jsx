@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 const weddingPhoto =
-  "https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780480766/WhatsApp_Image_2026-06-01_at_7.20.53_PM_iajgs7.jpg";
+  "https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1781083902/samplephoto-removebg-preview_m8uq8p.png";
 
 const stats = [
   { value: "800+", label: "Weddings" },
@@ -88,7 +88,7 @@ export default function TKMoments() {
             </svg>
           </div>
 
-          <h1 style={styles.tagline}>
+          <h1 style={styles.tagline} >
             Artistic Story Telling
             <br />
             <span style={styles.taglineAccent}>Celebrating YOU!</span>
@@ -246,7 +246,7 @@ const styles = {
     lineHeight: 1.25,
     margin: "0 0 18px",
     letterSpacing: "-0.01em",
-    fontFamily: "'Helvetica Neue', Arial, sans-serif",
+    fontFamily: "Georgia, 'Times New Roman', serif",
   },
   taglineAccent: {
     color: "#c97d6a",
@@ -256,7 +256,7 @@ const styles = {
     color: "#7a6560",
     lineHeight: 1.75,
     margin: "0 0 14px",
-    fontFamily: "'Helvetica Neue', Arial, sans-serif",
+    fontFamily: "Georgia, 'Times New Roman', serif",
     fontWeight: 400,
     maxWidth: 420,
   },
