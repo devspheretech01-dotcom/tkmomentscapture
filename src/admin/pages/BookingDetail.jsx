@@ -232,7 +232,9 @@ const DRIVE_TYPES = ["A", "B", "C", "D"];
 
 const getPhotographerConflict = (photo, selectedDay, booking) => {
   if (!photo.isActive) return "Photographer is inactive";
-  if (photo.bookedDates?.includes(selectedDay.date)) return "Booked for this event date";
+  const assignedIds = selectedDay ? getAssignedIdsForDay(booking, selectedDay.day) : [];
+  const photoId = getPhotoId(photo);
+  if (photo.bookedDates?.includes(selectedDay.date) && !assignedIds.includes(photoId)) return "Booked for this event date";
 
   return "";
 };
@@ -602,6 +604,7 @@ export default function BookingDetail() {
                           const showRole = shouldShowRoleLabel(serviceName, role);
                           const photos = getAssignedPhotosForService(draftBooking, event.day, item, allPhotographers);
                           const hasAvailable = role ? getAvailableCountForRole(allPhotographers, role, event) > 0 : true;
+                          const shouldShowUnavailable = !photos.length && !hasAvailable;
                           return (
                             <div key={`${event.day}-service-assign-${index}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-white px-2.5 py-2 text-xs text-slate-600 ring-1 ring-slate-100 dark:bg-card dark:text-muted-foreground dark:ring-border">
                               <span className="font-medium text-slate-800 dark:text-foreground">{serviceName}</span>
@@ -619,7 +622,7 @@ export default function BookingDetail() {
                               ) : (
                                 <span className="font-medium text-slate-400">Not assigned</span>
                               )}
-                              {!hasAvailable && (
+                              {shouldShowUnavailable && (
                                 <>
                                   <span className="text-slate-300">|</span>
                                   <span className="font-semibold text-red-600">Not available</span>
@@ -739,7 +742,7 @@ export default function BookingDetail() {
                         const need = selectedDayNeeds.find((item) => item.role === selectedCategory);
                         const isRoleFilled = getAssignedRoleCount(draftBooking, selectedDay.day, selectedCategory, allPhotographers, selectedDay) >= (need?.count || 1);
                         const isUnavailable = !!conflict || isAlreadyAssigned || isRoleFilled;
-                        const unavailableText = conflict ? "Not available" : isAlreadyAssigned ? "Already assigned to this day" : "Required count selected";
+                        const unavailableText = isAlreadyAssigned ? "Already assigned to this day" : conflict ? "Not available" : "Required count selected";
                         return (
                           <div key={photo.id} className={`flex items-center gap-3 p-3.5 border rounded-xl transition-all ${isUnavailable ? "border-slate-200 dark:border-border/60 bg-slate-50/80 dark:bg-slate-900/40 opacity-60" : "border-slate-200 dark:border-border/60 bg-white dark:bg-card hover:border-primary/20"}`}>
                             {photo.avatar ? (

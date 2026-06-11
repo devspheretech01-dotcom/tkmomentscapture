@@ -20,6 +20,13 @@ const STATUS_CONFIG = {
 const getBookingStatus = (booking) => booking.status || "pending";
 const getFirstEvent = (booking) => booking.events?.[0] || {};
 const getEventSummary = (booking) => `${booking.events?.length || 0} day${booking.events?.length === 1 ? "" : "s"}`;
+const getDateKey = (value) => {
+  if (!value) return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : format(date, "yyyy-MM-dd");
+};
+const hasEventOnDate = (booking, date) => !date || (booking.events || []).some((event) => getDateKey(event.date) === date);
 const getNumberOrNull = (value) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
@@ -52,6 +59,7 @@ export default function Bookings() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [eventDate, setEventDate] = useState("");
   const [sort, setSort] = useState("newest");
   const { data: apiBookings = [], isLoading, error } = useGetBookings();
   const deleteBooking = useDeleteBooking();
@@ -69,7 +77,8 @@ export default function Bookings() {
       firstEvent.location?.toLowerCase().includes(query) ||
       b.bookingId?.toLowerCase().includes(query);
     const matchStatus = status === "all" || getBookingStatus(b) === status;
-    return matchSearch && matchStatus;
+    const matchDate = hasEventOnDate(b, eventDate);
+    return matchSearch && matchStatus && matchDate;
   }).sort((a, b) => {
     if (sort === "oldest") return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
     if (sort === "amount_high") return getBookingDisplayAmount(b) - getBookingDisplayAmount(a);
@@ -133,7 +142,7 @@ export default function Bookings() {
       </div>
 
       {/* Filter bar */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto] items-center">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center">
         <div className="relative w-full max-w-full md:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-muted-foreground/70" />
           <Input
@@ -142,6 +151,25 @@ export default function Bookings() {
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 h-9 w-full bg-card text-sm border-border rounded-xl shadow-sm dark:bg-card"
           />
+        </div>
+        <div className="relative w-full md:w-44">
+          <Calendar className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 dark:text-muted-foreground/70" />
+          <Input
+            type="date"
+            value={eventDate}
+            onChange={(e) => setEventDate(e.target.value)}
+            className="h-9 w-full rounded-xl border-border bg-card pl-9 pr-8 text-sm shadow-sm dark:bg-card"
+          />
+          {eventDate && (
+            <button
+              type="button"
+              onClick={() => setEventDate("")}
+              className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+              aria-label="Clear date filter"
+            >
+              <XCircle className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
         <Select value={status} onValueChange={setStatus} className="w-full md:w-44">
           <SelectTrigger className="h-9 w-full bg-card border-border rounded-xl shadow-sm text-sm dark:bg-card">

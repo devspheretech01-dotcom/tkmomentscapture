@@ -21,8 +21,11 @@ const getRoleFromServiceName = (name = "") => {
   const value = String(name).toLowerCase();
   if (value.includes("drone")) return "drone";
   if (value.includes("cinema") || value.includes("film")) return "cinematographer";
+  if (value.includes("semi") && value.includes("candid") && (value.includes("video") || value.includes("videography"))) return "semi_candid_videographer";
+  if (value.includes("semi") && value.includes("candid") && (value.includes("photo") || value.includes("photography"))) return "semi_candid_photographer";
   if (value.includes("traditional") && (value.includes("video") || value.includes("videography"))) return "traditional_videographer";
   if (value.includes("traditional") && (value.includes("photo") || value.includes("photography"))) return "traditional_photographer";
+  if (value.includes("candid") && (value.includes("video") || value.includes("videography"))) return "semi_candid_videographer";
   if (value.includes("candid") && (value.includes("photo") || value.includes("photography"))) return "candid_photographer";
   if (value.includes("video") || value.includes("videography")) return "traditional_videographer";
   if (value.includes("photo") || value.includes("photography")) return "traditional_photographer";
@@ -34,8 +37,23 @@ const getServiceRole = (item) => {
 };
 const getAssignedPhotoRefs = (booking, day) => {
   const assigned = booking.assigned?.find((item) => item.day === day);
+  if (Array.isArray(assigned?.assignments)) {
+    return assigned.assignments.map((item) => item.photographerId);
+  }
   const photographers = assigned?.photographerIds || assigned?.photographerId || [];
   return Array.isArray(photographers) ? photographers : [photographers];
+};
+const getServiceId = (item) => {
+  const service = getService(item);
+  return service?._id || service?.id || (typeof service === "string" ? service : "") || item?.serviceId || item?.service || "";
+};
+const getAssignedServiceIdsForPhoto = (booking, day, photographerId) => {
+  const assigned = booking.assigned?.find((item) => item.day === day);
+  if (!Array.isArray(assigned?.assignments)) return [];
+  return assigned.assignments
+    .filter((item) => getPhotoId(item.photographerId) === photographerId)
+    .map((item) => getServiceId(item.serviceId))
+    .filter(Boolean);
 };
 const MONTHS = [
   { value: "all", label: "All Months" },
@@ -92,11 +110,15 @@ export default function PhotographerDetail() {
   const photographer = apiPhotographer;
   const bookedAssignments = useMemo(() => {
     if (!photographer) return [];
+    const photographerId = photographer.id || photographer._id;
     return bookings.flatMap((booking) => (
       (booking.events || []).flatMap((event) => {
-        const isAssigned = getAssignedPhotoRefs(booking, event.day).some((photo) => getPhotoId(photo) === photographer.id || getPhotoId(photo) === photographer._id);
+        const isAssigned = getAssignedPhotoRefs(booking, event.day).some((photo) => getPhotoId(photo) === photographerId);
         if (!isAssigned) return [];
-        const services = (event.services || []).filter((service) => getServiceRole(service) === photographer.role);
+        const assignedServiceIds = getAssignedServiceIdsForPhoto(booking, event.day, photographerId);
+        const services = assignedServiceIds.length
+          ? (event.services || []).filter((service) => assignedServiceIds.includes(getServiceId(service)))
+          : (event.services || []).filter((service) => getServiceRole(service) === photographer.role);
         return [{
           id: `${booking.id}-${event.day}`,
           bookingId: booking.bookingId || booking.id,
@@ -304,10 +326,10 @@ export default function PhotographerDetail() {
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-border dark:bg-slate-900/30 dark:text-muted-foreground">
                     <th className="px-4 py-3 text-left font-semibold">Date</th>
-                    <th className="px-4 py-3 text-left font-semibold">Name</th>
-                    <th className="px-4 py-3 text-left font-semibold">Function</th>
+                    <th className="px-4 py-3 text-left font-semibold">Client Name</th>
+                    <th className="px-4 py-3 text-left font-semibold">Booked Service</th>
                     <th className="px-4 py-3 text-left font-semibold">Location</th>
-                    <th className="px-4 py-3 text-right font-semibold">Amount</th>
+                    <th className="px-4 py-3 text-right font-semibold">Earning</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 dark:divide-border/60">
@@ -347,14 +369,33 @@ export default function PhotographerDetail() {
               {!photographer.bookedDates?.length || bookedAssignments.length ? (
                 <p className="px-5 py-6 text-sm text-slate-400 dark:text-muted-foreground/70 text-center">No booked details match this filter.</p>
               ) : (
-                photographer.bookedDates.map((date) => (
-                  <div key={date} className="flex items-center gap-4 px-5 py-3.5">
-                    <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                      <Calendar className="h-4 w-4 text-primary" />
-                    </div>
-                    <span className="text-sm font-semibold text-slate-900 dark:text-foreground">{format(new Date(date), "MMMM d, yyyy")}</span>
-                  </div>
-                ))
+                <div className="overflow-x-auto">
+                  <table className="min-w-[720px] w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-border dark:bg-slate-900/30 dark:text-muted-foreground">
+                        <th className="px-4 py-3 text-left font-semibold">Date</th>
+                        <th className="px-4 py-3 text-left font-semibold">Client Name</th>
+                        <th className="px-4 py-3 text-left font-semibold">Booked Service</th>
+                        <th className="px-4 py-3 text-right font-semibold">Earning</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 dark:divide-border/60">
+                      {photographer.bookedDates.map((date) => (
+                        <tr key={date} className="hover:bg-slate-50 dark:hover:bg-slate-900/30">
+                          <td className="px-4 py-3">
+                            <div className="inline-flex items-center gap-2 rounded-lg bg-yellow-100 px-2.5 py-1 font-semibold text-slate-900">
+                              <Calendar className="h-3.5 w-3.5 text-yellow-700" />
+                              {date ? format(new Date(date), "dd-MM-yyyy") : "-"}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-900 dark:text-foreground">-</td>
+                          <td className="px-4 py-3 text-slate-400">Booking detail not linked</td>
+                          <td className="px-4 py-3 text-right font-bold text-emerald-700">{formatMoney(photographer.perDayRate)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}
