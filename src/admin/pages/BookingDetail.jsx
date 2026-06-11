@@ -64,6 +64,11 @@ const getServiceName = (item) => {
   const service = getService(item);
   return service?.name || service || "Service";
 };
+const normalizeLabel = (value = "") => String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, " ");
+const shouldShowRoleLabel = (serviceName, role) => {
+  if (!role) return false;
+  return normalizeLabel(serviceName) !== normalizeLabel(getRoleLabel(role));
+};
 const getRoleFromServiceName = (name = "") => {
   const value = String(name).toLowerCase();
   if (value.includes("drone")) return "drone";
@@ -585,24 +590,22 @@ export default function BookingDetail() {
                         <span className="text-sm font-semibold text-slate-900 dark:text-foreground">{formatDateValue(event.date, "EEEE, MMM d, yyyy")}</span>
                       </div>
                       <p className="text-xs text-slate-500 dark:text-muted-foreground ml-8">{event.location}</p>
-                      <div className="ml-8 mt-2 flex flex-wrap gap-1.5">
-                        {requiredRoles.length ? requiredRoles.map((role) => (
-                          <span key={role} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200 dark:bg-card dark:text-muted-foreground dark:ring-border">
-                            {getRoleLabel(role)}
-                          </span>
-                        )) : (
+                      {!event.services?.length && (
+                        <div className="ml-8 mt-2 flex flex-wrap gap-1.5">
                           <span className="text-[11px] text-amber-600">No service role found</span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <div className="ml-8 mt-3 space-y-1.5">
                         {event.services?.map((item, index) => {
+                          const serviceName = getServiceName(item);
                           const role = getServiceRole(item);
+                          const showRole = shouldShowRoleLabel(serviceName, role);
                           const photos = getAssignedPhotosForService(draftBooking, event.day, item, allPhotographers);
                           const hasAvailable = role ? getAvailableCountForRole(allPhotographers, role, event) > 0 : true;
                           return (
                             <div key={`${event.day}-service-assign-${index}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-white px-2.5 py-2 text-xs text-slate-600 ring-1 ring-slate-100 dark:bg-card dark:text-muted-foreground dark:ring-border">
-                              <span className="font-medium text-slate-800 dark:text-foreground">{getServiceName(item)}</span>
-                              {role && (
+                              <span className="font-medium text-slate-800 dark:text-foreground">{serviceName}</span>
+                              {showRole && (
                                 <>
                                   <span className="text-slate-300">|</span>
                                   <span>{getRoleLabel(role)}</span>
@@ -970,12 +973,14 @@ export default function BookingDetail() {
                   </div>
                   <div className="space-y-1">
                     {event.services?.length ? event.services.map((item, index) => {
+                      const serviceName = getServiceName(item);
                       const role = getServiceRole(item);
+                      const showRole = shouldShowRoleLabel(serviceName, role);
                       return (
                         <div key={`${event.day}-${index}`} className="rounded-lg bg-white p-2 text-xs text-slate-600 dark:bg-card dark:text-muted-foreground">
                           <div className="flex items-start justify-between gap-3">
-                            <span className="min-w-0 break-words font-medium">{getServiceName(item)}</span>
-                            {role && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-900 dark:text-muted-foreground">{getRoleLabel(role)}</span>}
+                            <span className="min-w-0 break-words font-medium">{serviceName}</span>
+                            {showRole && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-900 dark:text-muted-foreground">{getRoleLabel(role)}</span>}
                           </div>
                           <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-400">
                             <span>Qty {item.quantity || 1}</span>

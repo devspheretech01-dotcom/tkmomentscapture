@@ -20,6 +20,23 @@ const STATUS_CONFIG = {
 const getBookingStatus = (booking) => booking.status || "pending";
 const getFirstEvent = (booking) => booking.events?.[0] || {};
 const getEventSummary = (booking) => `${booking.events?.length || 0} day${booking.events?.length === 1 ? "" : "s"}`;
+const getNumberOrNull = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+const firstAmount = (...values) => {
+  const amounts = values.map(getNumberOrNull).filter((value) => value !== null);
+  return amounts.find((value) => value > 0) ?? amounts[0] ?? 0;
+};
+const getBookingDisplayAmount = (booking) => {
+  const calculatedEstimate = (Number(booking.subtotal || 0) + Number(booking.profitAmount || 0)) || null;
+  const baseEstimate = firstAmount(booking.estimate, calculatedEstimate, booking.totalPrice, booking.payment?.totalAmount, booking.finalAmount);
+  const hasDiscount = Number(booking.discountPercentage || 0) > 0;
+
+  if (!hasDiscount) return baseEstimate;
+
+  return getNumberOrNull(booking.finalAmount) ?? Math.max(baseEstimate - Number(booking.discountAmount || 0), 0);
+};
 
 const INITIALS_COLORS = [
   "bg-primary/20 text-primary",
@@ -55,8 +72,8 @@ export default function Bookings() {
     return matchSearch && matchStatus;
   }).sort((a, b) => {
     if (sort === "oldest") return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
-    if (sort === "amount_high") return (b.estimate || 0) - (a.estimate || 0);
-    if (sort === "amount_low") return (a.estimate || 0) - (b.estimate || 0);
+    if (sort === "amount_high") return getBookingDisplayAmount(b) - getBookingDisplayAmount(a);
+    if (sort === "amount_low") return getBookingDisplayAmount(a) - getBookingDisplayAmount(b);
     if (sort === "date") return new Date(getFirstEvent(a).date || 0) - new Date(getFirstEvent(b).date || 0);
     return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
   });
@@ -229,6 +246,7 @@ export default function Bookings() {
               const firstEvent = getFirstEvent(b);
               const bookingStatus = getBookingStatus(b);
               const sc = STATUS_CONFIG[bookingStatus] || STATUS_CONFIG.pending;
+              const displayAmount = getBookingDisplayAmount(b);
               const ic = INITIALS_COLORS[idx % INITIALS_COLORS.length];
               const initials = getInitials(customer.name);
               return (
@@ -265,7 +283,7 @@ export default function Bookings() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(b.estimate || b.totalPrice || 0, settings.currency)}</span>
+                    <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(displayAmount, settings.currency)}</span>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
