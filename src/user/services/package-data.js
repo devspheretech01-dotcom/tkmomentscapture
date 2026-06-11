@@ -64,6 +64,8 @@ export const EVENT_SUGGESTIONS = [
 const roleIconMap = {
   traditional_photographer: 'Camera',
   traditional_videographer: 'Video',
+  semi_candid_photographer: 'Focus',
+  semi_candid_videographer: 'Film',
   candid_photographer: 'Sparkles',
   cinematographer: 'Clapperboard',
   drone: 'Plane',

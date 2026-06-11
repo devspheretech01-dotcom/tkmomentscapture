@@ -68,8 +68,11 @@ const getRoleFromServiceName = (name = "") => {
   const value = String(name).toLowerCase();
   if (value.includes("drone")) return "drone";
   if (value.includes("cinema") || value.includes("film")) return "cinematographer";
+  if (value.includes("semi") && value.includes("candid") && (value.includes("video") || value.includes("videography"))) return "semi_candid_videographer";
+  if (value.includes("semi") && value.includes("candid") && (value.includes("photo") || value.includes("photography"))) return "semi_candid_photographer";
   if (value.includes("traditional") && (value.includes("video") || value.includes("videography"))) return "traditional_videographer";
   if (value.includes("traditional") && (value.includes("photo") || value.includes("photography"))) return "traditional_photographer";
+  if (value.includes("candid") && (value.includes("video") || value.includes("videography"))) return "semi_candid_videographer";
   if (value.includes("candid") && (value.includes("photo") || value.includes("photography"))) return "candid_photographer";
   if (value.includes("video") || value.includes("videography")) return "traditional_videographer";
   if (value.includes("photo") || value.includes("photography")) return "traditional_photographer";
@@ -77,7 +80,15 @@ const getRoleFromServiceName = (name = "") => {
 };
 const getServiceRole = (item) => {
   const service = getService(item);
-  return getRoleFromServiceName(getServiceName(item)) || (typeof service === "object" ? service.role : "");
+  return (typeof service === "object" ? service.role : "") || getRoleFromServiceName(getServiceName(item));
+};
+const getNumberOrNull = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+const firstAmount = (...values) => {
+  const amounts = values.map(getNumberOrNull).filter((value) => value !== null);
+  return amounts.find((value) => value > 0) ?? amounts[0] ?? 0;
 };
 const getEventRequiredRoles = (event) => {
   const roles = event.services?.map(getServiceRole).filter(Boolean) || [];
@@ -309,8 +320,11 @@ export default function BookingDetail() {
   const categoryPhotographers = selectedCategory ? availablePhotographers.filter((photo) => photo.role === selectedCategory) : [];
   const assignedPhotographers = getUniqueAssignedPhotographers(booking, allPhotographers);
   const hasDiscount = Number(booking.discountPercentage || 0) > 0;
-  const baseEstimate = booking.estimate || ((booking.subtotal || 0) + (booking.profitAmount || 0));
-  const displayTotal = hasDiscount ? booking.finalAmount : (booking.payment?.totalAmount || baseEstimate);
+  const calculatedEstimate = (Number(booking.subtotal || 0) + Number(booking.profitAmount || 0)) || null;
+  const baseEstimate = firstAmount(booking.estimate, calculatedEstimate, booking.payment?.totalAmount, booking.finalAmount);
+  const displayTotal = hasDiscount
+    ? (getNumberOrNull(booking.finalAmount) ?? Math.max(baseEstimate - Number(booking.discountAmount || 0), 0))
+    : baseEstimate;
   const requiredPhotographerCount = booking.events?.reduce((sum, event) => (
     sum + getEventRoleNeeds(event).reduce((total, need) => total + need.count, 0)
   ), 0) || 0;
@@ -1064,7 +1078,7 @@ export default function BookingDetail() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-xs text-slate-400 dark:text-muted-foreground/70">Total</p>
-                <p className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(booking.payment?.totalAmount || booking.estimate || 0, settings.currency)}</p>
+                <p className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(displayTotal, settings.currency)}</p>
               </div>
               <div>
                 <p className="text-xs text-slate-400 dark:text-muted-foreground/70">Paid</p>

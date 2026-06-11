@@ -3,6 +3,8 @@ import { Aperture, Camera, Plane, Users, Video } from "lucide-react";
 export const ROLE_CONFIG = {
   candid_photographer: { label: "Candid Photographer", icon: Aperture, cls: "bg-cyan-50 text-cyan-700 ring-cyan-200" },
   drone: { label: "Drone Photographer", icon: Plane, cls: "bg-sky-50 text-sky-700 ring-sky-200" },
+  semi_candid_photographer: { label: "Semi Candid Photographer", icon: Aperture, cls: "bg-teal-50 text-teal-700 ring-teal-200" },
+  semi_candid_videographer: { label: "Semi Candid Videographer", icon: Video, cls: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
   traditional_photographer: { label: "Traditional Photographer", icon: Camera, cls: "bg-amber-50 text-amber-700 ring-amber-200" },
   cinematographer: { label: "Cinematographer", icon: Video, cls: "bg-violet-50 text-violet-700 ring-violet-200" },
   traditional_videographer: { label: "Traditional Videographer", icon: Users, cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
