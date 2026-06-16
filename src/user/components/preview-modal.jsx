@@ -62,32 +62,11 @@ export function PreviewModal({
     setCustomerDetails(null)
   }
 
+  // Prevent accidental loss of user-entered data.
+  // Outside-click / escape can trigger Dialog's `onOpenChange(false)`, so we ignore it.
   const handleCloseModal = (newOpen) => {
-    if (!newOpen) {
-      if (customerDetails) {
-        const payload = buildBookingPayload({
-          events,
-          services,
-          albumSelection,
-          addonServices,
-          customerDetails,
-          isConfirmed: false,
-        })
-
-        if (payload.events.length > 0) {
-          setIsSavingEnquiry(true)
-          createBooking(payload)
-            .catch((error) => {
-              console.error('Unable to save enquiry:', error)
-            })
-            .finally(() => setIsSavingEnquiry(false))
-        }
-      }
-
-      setStep('album')
-      setCustomerDetails(null)
-      setAlbumSelection(createAlbumSelection())
-    }
+    // Ignore any outside/escape triggered close; modal can only be closed via explicit actions.
+    if (!newOpen) return
     onOpenChange(newOpen)
   }
 
@@ -116,8 +95,9 @@ export function PreviewModal({
             albumSelection={albumSelection}
             addonServices={addonServices}
             onChange={setAlbumSelection}
-            onBack={() => handleCloseModal(false)}
+            onBack={() => onOpenChange(false)}
             onContinue={() => setStep('details')}
+
           />
         )}
 

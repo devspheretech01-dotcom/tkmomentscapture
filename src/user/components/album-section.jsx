@@ -2,46 +2,8 @@ import { BookOpen, Check, HardDrive, Image, Play, Video } from 'lucide-react'
 import { Button } from '@user/components/ui/button'
 import { Input } from '@user/components/ui/input'
 
-export const ALBUM_ADDONS = [
-  {
-    id: 'premiumAlbum',
-    name: 'Premium Album',
-    price: 15000,
-    icon: BookOpen,
-  },
-  {
-    id: 'videoEditing',
-    name: 'Video Editing',
-    price: 15000,
-    icon: Video,
-  },
-  {
-    id: 'magazine',
-    name: 'Magazine',
-    price: 3000,
-    icon: BookOpen,
-  },
-  {
-    id: 'hardDrive',
-    name: '500GB Hard Drive',
-    price: 2700,
-    icon: HardDrive,
-  },
-  {
-    id: 'sameDayHighlight',
-    name: 'Same Day Highlight',
-    price: 15000,
-    icon: Play,
-  },
-  {
-    id: 'sameDayPhotoScanner',
-    name: 'Same Day Photo Through Scanner',
-    price: 10000,
-    icon: Image,
-  },
-]
-
 export const EDITED_PHOTO_PRICE = 30
+
 
 const iconMap = {
   BookOpen,
@@ -64,9 +26,12 @@ export function createAlbumSelection() {
   }
 }
 
-export function getAlbumLineItems(albumSelection, addonServices = ALBUM_ADDONS) {
-  const selectedAddons = addonServices.filter((addon) => albumSelection[addon.id]).map(
-    (addon) => {
+export function getAlbumLineItems(albumSelection, addonServices) {
+  const safeAddonServices = Array.isArray(addonServices) ? addonServices : []
+
+  const selectedAddons = safeAddonServices
+    .filter((addon) => albumSelection[addon.id])
+    .map((addon) => {
       const quantity = addon.priceType === 'per_unit'
         ? Math.max(1, Number(albumSelection.addonQuantities?.[addon.id]) || 1)
         : 1
@@ -80,12 +45,13 @@ export function getAlbumLineItems(albumSelection, addonServices = ALBUM_ADDONS) 
         quantity,
         priceType: addon.priceType,
       }
-    }
-  )
+    })
+
 
   const editedPhotos = Number(albumSelection.editedPhotos) || 0
   if (editedPhotos > 0) {
-    const editedPhotoService = addonServices.find((addon) => {
+    const editedPhotoService = safeAddonServices.find((addon) => {
+
       const name = addon.name?.toLowerCase() || ''
       return name.includes('edited photo') || (name.includes('edit') && name.includes('photo'))
     })
@@ -110,7 +76,8 @@ export function calculateAlbumTotal(albumSelection, addonServices) {
 }
 
 export function AlbumSection({ albumSelection, addonServices, onChange, onBack, onContinue }) {
-  const visibleAddons = addonServices?.length ? addonServices : ALBUM_ADDONS
+  const visibleAddons = Array.isArray(addonServices) ? addonServices : []
+
 
   const handleToggle = (id) => {
     const isSelected = albumSelection[id]

@@ -6,10 +6,11 @@ import { EventCard } from './event-card'
 import { ServiceSelector } from './service-selector'
 import { PricingSummary } from './pricing-summary'
 import { PreviewModal } from './preview-modal'
-import { SERVICES, normalizeService } from '@user/services/package-data'
+import { normalizeService } from '@user/services/package-data'
 import { getServices } from '@user/services/api'
 
 const logoUrl = 'https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780483670/TkLogo-bgremove_xfnydo.png'
+
 
 function generateId() {
   return Math.random().toString(36).substring(2, 9)
@@ -32,14 +33,19 @@ export function PackageBuilder({ onBack }) {
   const [discountPercent, setDiscountPercent] = useState(0)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [backendServices, setBackendServices] = useState([])
+  const [isLoadingServices, setIsLoadingServices] = useState(false)
+  const [servicesError, setServicesError] = useState(null)
 
   const activeEvent = events.find((e) => e.id === activeEventId) || events[0]
   const shootServices = backendServices.filter((service) => service.type === 'shoot')
   const addonServices = backendServices.filter((service) => service.type === 'addon')
-  const services = shootServices.length > 0 ? shootServices : SERVICES
+  const services = shootServices
 
   useEffect(() => {
     let isMounted = true
+
+    setIsLoadingServices(true)
+    setServicesError(null)
 
     getServices()
       .then((data) => {
@@ -47,13 +53,20 @@ export function PackageBuilder({ onBack }) {
         setBackendServices((data.services || []).map(normalizeService))
       })
       .catch((error) => {
+        if (!isMounted) return
         console.error('Unable to load backend services:', error)
+        setServicesError(error?.message || 'Unable to load services')
+      })
+      .finally(() => {
+        if (!isMounted) return
+        setIsLoadingServices(false)
       })
 
     return () => {
       isMounted = false
     }
   }, [])
+
 
   const handleAddEvent = useCallback(() => {
     const newEvent = createNewEvent()
@@ -209,12 +222,29 @@ export function PackageBuilder({ onBack }) {
                 </p>
               </div>
 
-              <ServiceSelector
-                services={services}
-                selectedServices={activeEvent.selectedServices}
-                onToggle={handleToggleService}
-              />
+              {isLoadingServices ? (
+                <div className="space-y-3">
+                  <div className="h-10 w-full rounded-lg bg-muted/40 animate-pulse" />
+                  <div className="h-10 w-full rounded-lg bg-muted/40 animate-pulse" />
+                  <div className="h-10 w-full rounded-lg bg-muted/40 animate-pulse" />
+                </div>
+              ) : servicesError ? (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+                  Unable to load services. Please refresh.
+                </div>
+              ) : services.length === 0 ? (
+                <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+                  No services available.
+                </div>
+              ) : (
+                <ServiceSelector
+                  services={services}
+                  selectedServices={activeEvent.selectedServices}
+                  onToggle={handleToggleService}
+                />
+              )}
             </section>
+
 
             {/* Add Event Button - After Services */}
             <div className="pt-4">

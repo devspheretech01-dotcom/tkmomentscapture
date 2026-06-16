@@ -60,10 +60,10 @@ export function PricingSummary({
               <Button className="w-full" onClick={onPreview}>
                 Preview Package
               </Button>
-              <Button variant="outline" className="w-full" onClick={onGeneratePDF}>
+              {/* <Button variant="outline" className="w-full" onClick={onGeneratePDF}>
                 <FileText className="size-4 mr-2" />
                 PDF
-              </Button>
+              </Button> */}
             </div>
           </>
         )}
