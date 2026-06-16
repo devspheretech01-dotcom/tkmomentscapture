@@ -93,7 +93,11 @@ export function PreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={handleCloseModal}>
-      <DialogContent className="package-builder-theme max-h-[85vh] w-[calc(100vw-2rem)] gap-6 overflow-y-auto p-5 sm:max-w-lg sm:p-7">
+      <DialogContent
+        className="package-builder-theme max-h-[85vh] w-[calc(100vw-2rem)] gap-6 overflow-y-auto p-5 sm:max-w-lg sm:p-7"
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
+      >
         <DialogHeader className="space-y-2 border-b border-border pb-5 pr-8">
           <DialogTitle className="text-xl">
             {step === 'album' && 'Album Add-ons'}

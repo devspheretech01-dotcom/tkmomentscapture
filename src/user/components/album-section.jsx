@@ -60,19 +60,27 @@ export function createAlbumSelection() {
     sameDayHighlight: false,
     sameDayPhotoScanner: false,
     editedPhotos: 0,
+    addonQuantities: {},
   }
 }
 
 export function getAlbumLineItems(albumSelection, addonServices = ALBUM_ADDONS) {
   const selectedAddons = addonServices.filter((addon) => albumSelection[addon.id]).map(
-    (addon) => ({
-      id: addon.id,
-      serviceId: addon.backendId || addon.id,
-      name: addon.name,
-      price: addon.price || addon.pricePerDay || 0,
-      quantity: addon.quantity || 1,
-      priceType: addon.priceType,
-    })
+    (addon) => {
+      const quantity = addon.priceType === 'per_unit'
+        ? Math.max(1, Number(albumSelection.addonQuantities?.[addon.id]) || 1)
+        : 1
+      const unitPrice = addon.price || addon.pricePerDay || 0
+
+      return {
+        id: addon.id,
+        serviceId: addon.backendId || addon.id,
+        name: addon.name,
+        price: addon.priceType === 'per_unit' ? unitPrice * quantity : unitPrice,
+        quantity,
+        priceType: addon.priceType,
+      }
+    }
   )
 
   const editedPhotos = Number(albumSelection.editedPhotos) || 0
@@ -105,9 +113,19 @@ export function AlbumSection({ albumSelection, addonServices, onChange, onBack, 
   const visibleAddons = addonServices?.length ? addonServices : ALBUM_ADDONS
 
   const handleToggle = (id) => {
+    const isSelected = albumSelection[id]
+    const nextQuantities = { ...(albumSelection.addonQuantities || {}) }
+
+    if (isSelected) {
+      delete nextQuantities[id]
+    } else if (!nextQuantities[id]) {
+      nextQuantities[id] = 1
+    }
+
     onChange({
       ...albumSelection,
-      [id]: !albumSelection[id],
+      [id]: !isSelected,
+      addonQuantities: nextQuantities,
     })
   }
 
@@ -116,6 +134,16 @@ export function AlbumSection({ albumSelection, addonServices, onChange, onBack, 
     onChange({
       ...albumSelection,
       editedPhotos: value,
+    })
+  }
+
+  const handleAddonQuantityChange = (id, value) => {
+    onChange({
+      ...albumSelection,
+      addonQuantities: {
+        ...(albumSelection.addonQuantities || {}),
+        [id]: Math.max(1, Number(value) || 1),
+      },
     })
   }
 
@@ -134,49 +162,55 @@ export function AlbumSection({ albumSelection, addonServices, onChange, onBack, 
           const selected = albumSelection[addon.id]
 
           return (
-            <button
+            <div
               key={addon.id}
-              type="button"
-              onClick={() => handleToggle(addon.id)}
-              className={`flex min-w-0 items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
+              className={`rounded-lg border transition-colors ${
                 selected
                   ? 'border-primary bg-primary/10 text-foreground'
                   : 'border-border bg-card hover:bg-accent/40'
               }`}
             >
-              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-                <Icon className="size-4" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block break-words text-sm font-medium">{addon.name}</span>
-              </span>
-              <span
-                className={`grid size-5 shrink-0 place-items-center rounded-full border ${
-                  selected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'
-                }`}
+              <button
+                type="button"
+                onClick={() => handleToggle(addon.id)}
+                className="flex w-full min-w-0 items-center gap-3 p-3 text-left"
               >
-                {selected && <Check className="size-3" />}
-              </span>
-            </button>
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                  <Icon className="size-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block break-words text-sm font-medium">{addon.name}</span>
+                </span>
+                <span
+                  className={`grid size-5 shrink-0 place-items-center rounded-full border ${
+                    selected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'
+                  }`}
+                >
+                  {selected && <Check className="size-3" />}
+                </span>
+              </button>
+
+              {selected && addon.priceType === 'per_unit' && (
+                <div className="border-t border-border/60 px-3 pb-3 pt-2">
+                  <label className="mb-1.5 block text-xs font-medium text-muted-foreground" htmlFor={`addon-qty-${addon.id}`}>
+                    Qty
+                  </label>
+                  <Input
+                    id={`addon-qty-${addon.id}`}
+                    type="number"
+                    min="1"
+                    value={albumSelection.addonQuantities?.[addon.id] || 1}
+                    onChange={(event) => handleAddonQuantityChange(addon.id, event.target.value)}
+                    className="h-10 bg-background sm:max-w-28"
+                  />
+                </div>
+              )}
+            </div>
           )
         })}
       </div>
 
-      <div className="space-y-2 rounded-lg border bg-card p-3">
-        <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <Image className="size-4 text-primary" />
-          Edited Photos
-        </label>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Input
-            type="number"
-            min="0"
-            value={albumSelection.editedPhotos}
-            onChange={handleEditedPhotosChange}
-            className="bg-background sm:max-w-36"
-          />
-        </div>
-      </div>
+      
 
       <div className="flex flex-col-reverse gap-3 justify-end sm:flex-row">
         <Button type="button" variant="outline" onClick={onBack} className="w-full sm:w-auto">
