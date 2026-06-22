@@ -21,6 +21,7 @@ export function PreviewModal({
   events,
   services,
   addonServices,
+  isLoadingAddons = false,
 }) {
   const [step, setStep] = useState('album')
   const [customerDetails, setCustomerDetails] = useState(null)
@@ -94,6 +95,7 @@ export function PreviewModal({
           <AlbumSection
             albumSelection={albumSelection}
             addonServices={addonServices}
+            isLoading={isLoadingAddons}
             onChange={setAlbumSelection}
             onBack={() => onOpenChange(false)}
             onContinue={() => setStep('details')}

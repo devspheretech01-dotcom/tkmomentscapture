@@ -11,6 +11,28 @@ import { getServices } from '@user/services/api'
 
 const logoUrl = 'https://res.cloudinary.com/dx8zo5ukg/image/upload/q_auto/f_auto/v1780483670/TkLogo-bgremove_xfnydo.png'
 
+function ServiceSelectionSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:gap-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div
+          key={index}
+          className="min-h-[5.75rem] rounded-lg border-2 border-border bg-card p-4 sm:min-h-[6.25rem] sm:p-5"
+        >
+          <div className="flex items-start gap-3">
+            <div className="size-9 shrink-0 animate-pulse rounded-lg bg-muted" />
+            <div className="min-w-0 flex-1 space-y-2 pr-7">
+              <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+              <div className="h-3 w-full animate-pulse rounded bg-muted/80" />
+              <div className="h-3 w-4/5 animate-pulse rounded bg-muted/80" />
+            </div>
+            <div className="size-5 shrink-0 animate-pulse rounded-full bg-muted" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 function generateId() {
   return Math.random().toString(36).substring(2, 9)
@@ -223,11 +245,7 @@ export function PackageBuilder({ onBack }) {
               </div>
 
               {isLoadingServices ? (
-                <div className="space-y-3">
-                  <div className="h-10 w-full rounded-lg bg-muted/40 animate-pulse" />
-                  <div className="h-10 w-full rounded-lg bg-muted/40 animate-pulse" />
-                  <div className="h-10 w-full rounded-lg bg-muted/40 animate-pulse" />
-                </div>
+                <ServiceSelectionSkeleton />
               ) : servicesError ? (
                 <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
                   Unable to load services. Please refresh.
@@ -290,6 +308,7 @@ export function PackageBuilder({ onBack }) {
         events={events}
         services={services}
         addonServices={addonServices}
+        isLoadingAddons={isLoadingServices}
         discountPercent={discountPercent}
       />
     </div>

@@ -485,6 +485,7 @@ export default function BookingDetail() {
         driveType: "A",
         receivedBy: "",
         note: "",
+        copiedToPC: false,
         ...(current[photographerId] || {}),
         [key]: value,
       },
@@ -499,6 +500,7 @@ export default function BookingDetail() {
       driveType: form.driveType || "A",
       receivedBy: form.receivedBy || "",
       note: form.note || "",
+      copiedToPC: form.copiedToPC === true,
     };
     if (!payload.receivedBy.trim()) {
       toast({ title: "Receiver required", description: "Enter who received the drive." });
@@ -507,9 +509,29 @@ export default function BookingDetail() {
     updateDataHandover.mutate({ id, data: payload }, {
       onSuccess: () => {
         toast({ title: "Data handover saved", description: `Drive ${payload.driveType} marked as received.` });
-        setHandoverForms((current) => ({ ...current, [photographerId]: { driveType: "A", receivedBy: "", note: "" } }));
+        setHandoverForms((current) => ({ ...current, [photographerId]: { driveType: "A", receivedBy: "", note: "", copiedToPC: false } }));
       },
       onError: (err) => toast({ title: "Handover failed", description: err.message }),
+    });
+  };
+
+  const handleCopiedToPCChange = (photographerId, drive, copiedToPC) => {
+    updateDataHandover.mutate({
+      id,
+      data: {
+        photographerId,
+        driveId: drive._id || drive.id,
+        driveType: drive.driveType,
+        receivedBy: drive.receivedBy || "",
+        note: drive.note || "",
+        copiedToPC,
+      },
+    }, {
+      onSuccess: () => toast({
+        title: copiedToPC ? "Copied to PC" : "Copy pending",
+        description: `Drive ${drive.driveType} status updated.`,
+      }),
+      onError: (err) => toast({ title: "Handover update failed", description: err.message }),
     });
   };
 
@@ -799,8 +821,7 @@ export default function BookingDetail() {
                 {assignedPhotographers.map((photo) => {
                   const photographerId = getPhotoId(photo);
                   const entry = getHandoverEntry(booking, photographerId);
-                  const form = handoverForms[photographerId] || { driveType: "A", receivedBy: "", note: "" };
-                  const submittedDriveTypes = entry?.drives?.map((drive) => drive.driveType) || [];
+                  const form = handoverForms[photographerId] || { driveType: "A", receivedBy: "", note: "", copiedToPC: false };
                   return (
                     <div key={photographerId} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-border dark:bg-slate-900/20">
                       <div className="grid gap-4 xl:grid-cols-[minmax(240px,0.75fr)_minmax(0,1.25fr)]">
@@ -822,10 +843,33 @@ export default function BookingDetail() {
                           <div className="mt-3">
                             {entry?.drives?.length ? (
                               <div className="space-y-2">
-                                {entry.drives.map((drive) => (
-                                  <div key={`${photographerId}-${drive.driveType}`} className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/60">
-                                    <p className="font-semibold">Drive {drive.driveType} received by {drive.receivedBy || "-"}</p>
-                                    <p className="mt-0.5 text-emerald-600 dark:text-emerald-400">{formatDateValue(drive.handedOverDate)}{drive.note ? ` | ${drive.note}` : ""}</p>
+                                {entry.drives.map((drive, driveIndex) => (
+                                  <div key={drive._id || `${photographerId}-${drive.driveType}-${driveIndex}`} className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/60">
+                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                      <div>
+                                        <p className="font-semibold">Drive {drive.driveType} received by {drive.receivedBy || "-"}</p>
+                                        <p className="mt-0.5 text-emerald-600 dark:text-emerald-400">{formatDateValue(drive.handedOverDate)}</p>
+                                      </div>
+                                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${drive.copiedToPC === true ? "bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:ring-sky-900/70" : "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:ring-amber-900/70"}`}>
+                                        {drive.copiedToPC === true ? "Copied to PC" : "PC copy pending"}
+                                      </span>
+                                    </div>
+                                    {drive.note && (
+                                      <div className="mt-2 rounded-md bg-white/70 px-2 py-1.5 text-slate-600 ring-1 ring-emerald-100 dark:bg-slate-950/30 dark:text-slate-300 dark:ring-emerald-900/40">
+                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Note</p>
+                                        <p className="mt-0.5 whitespace-pre-line break-words leading-relaxed">{drive.note}</p>
+                                      </div>
+                                    )}
+                                    <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                                      <input
+                                        type="checkbox"
+                                        checked={drive.copiedToPC === true}
+                                        disabled={updateDataHandover.isPending || !(drive._id || drive.id)}
+                                        onChange={(event) => handleCopiedToPCChange(photographerId, drive, event.target.checked)}
+                                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                      />
+                                      Data copied to admin PC
+                                    </label>
                                   </div>
                                 ))}
                               </div>
@@ -847,7 +891,7 @@ export default function BookingDetail() {
                               className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-border dark:bg-card dark:text-foreground"
                             >
                               {DRIVE_TYPES.map((drive) => (
-                                <option key={drive} value={drive} disabled={submittedDriveTypes.includes(drive)}>Drive {drive}</option>
+                                <option key={drive} value={drive}>Drive {drive}</option>
                               ))}
                             </select>
                           </label>
@@ -869,11 +913,20 @@ export default function BookingDetail() {
                               placeholder="Optional note"
                             />
                           </label>
+                          <label className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 dark:border-border dark:bg-card dark:text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={form.copiedToPC === true}
+                              onChange={(e) => handleHandoverChange(photographerId, "copiedToPC", e.target.checked)}
+                              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                            />
+                            Copied to PC
+                          </label>
                           </div>
                           <div className="flex justify-end">
                             <button
                               onClick={(event) => handleDataHandoverSubmit(event, photographerId)}
-                              disabled={updateDataHandover.isPending || submittedDriveTypes.includes(form.driveType)}
+                              disabled={updateDataHandover.isPending}
                               className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                             >
                               <HardDrive className="h-4 w-4" /> Save

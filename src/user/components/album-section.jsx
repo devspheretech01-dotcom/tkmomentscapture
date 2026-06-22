@@ -75,7 +75,26 @@ export function calculateAlbumTotal(albumSelection, addonServices) {
   return getAlbumLineItems(albumSelection, addonServices).reduce((total, item) => total + item.price, 0)
 }
 
-export function AlbumSection({ albumSelection, addonServices, onChange, onBack, onContinue }) {
+function AddonSkeleton() {
+  return (
+    <div className="grid gap-3">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-3">
+            <div className="size-9 shrink-0 animate-pulse rounded-full bg-muted" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+              <div className="h-3 w-1/2 animate-pulse rounded bg-muted/80" />
+            </div>
+            <div className="size-5 shrink-0 animate-pulse rounded-full bg-muted" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function AlbumSection({ albumSelection, addonServices, isLoading = false, onChange, onBack, onContinue }) {
   const visibleAddons = Array.isArray(addonServices) ? addonServices : []
 
 
@@ -123,8 +142,11 @@ export function AlbumSection({ albumSelection, addonServices, onChange, onBack, 
         </p>
       </div>
 
-      <div className="grid gap-3">
-        {visibleAddons.map((addon) => {
+      {isLoading ? (
+        <AddonSkeleton />
+      ) : (
+        <div className="grid gap-3">
+          {visibleAddons.map((addon) => {
           const Icon = typeof addon.icon === 'string' ? iconMap[addon.icon] || BookOpen : addon.icon
           const selected = albumSelection[addon.id]
 
@@ -174,8 +196,9 @@ export function AlbumSection({ albumSelection, addonServices, onChange, onBack, 
               )}
             </div>
           )
-        })}
-      </div>
+          })}
+        </div>
+      )}
 
       
 
@@ -183,7 +206,7 @@ export function AlbumSection({ albumSelection, addonServices, onChange, onBack, 
         <Button type="button" variant="outline" onClick={onBack} className="w-full sm:w-auto">
           Back
         </Button>
-        <Button type="button" onClick={onContinue} className="w-full sm:w-auto">
+        <Button type="button" onClick={onContinue} disabled={isLoading} className="w-full sm:w-auto">
           Continue to Details
         </Button>
       </div>
