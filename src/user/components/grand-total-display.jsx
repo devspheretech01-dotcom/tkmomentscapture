@@ -131,13 +131,19 @@ export function GrandTotalDisplay({
             <div className="space-y-2 pl-4">
               {event.selectedServices.map((serviceId) => {
                 const service = services.find((s) => s.id === serviceId)
+                const quantity = Math.max(1, Number(event.serviceQuantities?.[serviceId]) || 1)
                 return (
                   <div
                     key={serviceId}
-                    className="flex items-center gap-2.5 text-sm text-muted-foreground"
+                    className="flex items-center justify-between gap-3 text-sm text-muted-foreground"
                   >
-                    <Check className="size-3 text-green-600" />
-                    {service?.name}
+                    <span className="inline-flex min-w-0 items-center gap-2.5">
+                      <Check className="size-3 shrink-0 text-green-600" />
+                      <span className="min-w-0 break-words">{service?.name}</span>
+                    </span>
+                    <span className="shrink-0 rounded-md bg-background px-2 py-0.5 text-xs font-semibold text-foreground ring-1 ring-border">
+                      Qty {quantity}
+                    </span>
                   </div>
                 )
               })}

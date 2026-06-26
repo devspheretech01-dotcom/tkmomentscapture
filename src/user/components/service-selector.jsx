@@ -20,18 +20,17 @@ const iconMap = {
   Plane: Plane,
 }
 
-export function ServiceSelector({ services, selectedServices, onToggle }) {
+export function ServiceSelector({ services, selectedServices, serviceQuantities = {}, onToggle, onQuantityChange }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:gap-4">
       {services.map((service) => {
         const Icon = iconMap[service.icon] || Camera
         const isSelected = selectedServices.includes(service.id)
+        const quantity = Math.max(1, Number(serviceQuantities[service.id]) || 1)
 
         return (
-          <button
+          <div
             key={service.id}
-            type="button"
-            onClick={() => onToggle(service.id)}
             className={cn(
               'relative flex min-h-[5.75rem] w-full items-start gap-3 rounded-lg border-2 p-4 text-left transition-all duration-200 group sm:min-h-[6.25rem] sm:p-5',
               isSelected
@@ -47,6 +46,7 @@ export function ServiceSelector({ services, selectedServices, onToggle }) {
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted border border-border group-hover:border-primary/50'
               )}
+              onClick={() => onToggle(service.id)}
             >
               {isSelected && <Check className="size-3" />}
             </div>
@@ -64,15 +64,39 @@ export function ServiceSelector({ services, selectedServices, onToggle }) {
             </div>
 
             {/* Content */}
-            <div className="flex-1 min-w-0 pr-7">
-              <h4 className="break-words font-medium text-foreground text-sm leading-tight">
-                {service.name}
-              </h4>
-              <p className="mt-2 break-words text-xs leading-5 text-muted-foreground">
-                {service.description}
-              </p>
-            </div>
-          </button>
+            <button
+              type="button"
+              onClick={() => onToggle(service.id)}
+              className="min-w-0 flex-1 pr-7 text-left"
+            >
+              <div>
+                <h4 className="break-words font-medium text-foreground text-sm leading-tight">
+                  {service.name}
+                </h4>
+                <p className="mt-2 break-words text-xs leading-5 text-muted-foreground">
+                  {service.description}
+                </p>
+              </div>
+            </button>
+
+            {isSelected && (
+              <div className="absolute bottom-3 right-3 flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1 shadow-sm">
+                <label htmlFor={`quantity-${service.id}`} className="text-[11px] font-medium text-muted-foreground">
+                  Quantity
+                </label>
+                <input
+                  id={`quantity-${service.id}`}
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={quantity}
+                  onChange={(event) => onQuantityChange?.(service.id, event.target.value)}
+                  onClick={(event) => event.stopPropagation()}
+                  className="h-7 w-14 rounded border border-border bg-card px-2 text-center text-xs font-semibold text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+            )}
+          </div>
         )
       })}
     </div>

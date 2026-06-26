@@ -46,6 +46,7 @@ function createNewEvent() {
     date: undefined,
     time: '',
     selectedServices: [],
+    serviceQuantities: {},
   }
 }
 
@@ -129,13 +130,40 @@ export function PackageBuilder({ onBack }) {
         prev.map((e) => {
           if (e.id !== activeEventId) return e
           const isSelected = e.selectedServices.includes(serviceId)
+          const serviceQuantities = { ...(e.serviceQuantities || {}) }
+          if (isSelected) {
+            delete serviceQuantities[serviceId]
+          } else {
+            serviceQuantities[serviceId] = 1
+          }
           return {
             ...e,
             selectedServices: isSelected
               ? e.selectedServices.filter((id) => id !== serviceId)
               : [...e.selectedServices, serviceId],
+            serviceQuantities,
           }
         })
+      )
+    },
+    [activeEventId]
+  )
+
+  const handleQuantityChange = useCallback(
+    (serviceId, quantity) => {
+      const nextQuantity = Math.max(1, Math.floor(Number(quantity) || 1))
+      setEvents((prev) =>
+        prev.map((event) => (
+          event.id === activeEventId
+            ? {
+              ...event,
+              serviceQuantities: {
+                ...(event.serviceQuantities || {}),
+                [serviceId]: nextQuantity,
+              },
+            }
+            : event
+        ))
       )
     },
     [activeEventId]
@@ -258,7 +286,9 @@ export function PackageBuilder({ onBack }) {
                 <ServiceSelector
                   services={services}
                   selectedServices={activeEvent.selectedServices}
+                  serviceQuantities={activeEvent.serviceQuantities}
                   onToggle={handleToggleService}
+                  onQuantityChange={handleQuantityChange}
                 />
               )}
             </section>

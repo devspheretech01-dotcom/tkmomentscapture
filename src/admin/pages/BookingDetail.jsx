@@ -22,7 +22,7 @@ import { format } from "date-fns";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@admin/components/ui/dialog";
 import { Button } from "@admin/components/ui/button";
-import { MapPin, Mail, Phone, Calendar, ChevronLeft, CheckCircle, User, Lock, AlertCircle, Trash2, Wallet, ArrowLeft, Camera, HardDrive, XCircle } from "lucide-react";
+import { MapPin, Mail, Phone, Calendar, ChevronLeft, CheckCircle, User, Lock, AlertCircle, Trash2, Wallet, ArrowLeft, Camera, HardDrive, XCircle, Download } from "lucide-react";
 import { useToast } from "@shared/hooks/use-toast";
 
 const STATUS_CONFIG = {
@@ -64,6 +64,7 @@ const getServiceName = (item) => {
   const service = getService(item);
   return service?.name || service || "Service";
 };
+const getServiceQuantity = (item) => Math.max(1, Number(item?.quantity) || 1);
 const normalizeLabel = (value = "") => String(value).trim().toLowerCase().replace(/[^a-z0-9]+/g, " ");
 const shouldShowRoleLabel = (serviceName, role) => {
   if (!role) return false;
@@ -108,8 +109,9 @@ const getEventRoleNeeds = (event) => {
     const role = getServiceRole(item);
     if (!role) return;
     if (!needs[role]) needs[role] = { role, services: [], count: 0 };
-    needs[role].services.push(getServiceName(item));
-    needs[role].count += 1;
+    const quantity = getServiceQuantity(item);
+    needs[role].services.push(`${getServiceName(item)} x ${quantity}`);
+    needs[role].count += quantity;
   });
   return Object.values(needs);
 };
@@ -124,6 +126,11 @@ const getAssignedPhotosForService = (booking, day, serviceItem, allPhotographers
   getAssignedEntries(booking, day)
     .filter((assignment) => getServiceId(assignment.serviceId) === getServiceId(serviceItem))
     .map((assignment) => getResolvedPhoto(assignment.photographerId, allPhotographers))
+);
+const getAssignedCountForService = (booking, day, serviceItem) => (
+  getAssignedEntries(booking, day)
+    .filter((assignment) => getServiceId(assignment.serviceId) === getServiceId(serviceItem))
+    .length
 );
 const getAssignedRoleCount = (booking, day, role, allPhotographers, event) => {
   const entries = getAssignedEntries(booking, day);
@@ -165,6 +172,7 @@ const getNormalizedAssignments = (assigned = []) => assigned.map((item) => ({
     ? item.assignments.map((assignment) => ({
       photographerId: assignment.photographerId,
       serviceId: assignment.serviceId,
+      payAmount: assignment.payAmount,
     }))
     : (Array.isArray(item.photographerIds || item.photographerId)
       ? (item.photographerIds || item.photographerId)
@@ -177,10 +185,11 @@ const getAssignmentPayload = (assigned = []) => assigned.map((item) => ({
     .map((assignment) => ({
       photographerId: getPhotoId(assignment.photographerId),
       serviceId: getServiceId(assignment.serviceId),
+      payAmount: Math.max(0, Number(assignment.payAmount) || 0),
     }))
     .filter((assignment) => assignment.photographerId && assignment.serviceId),
 }));
-const getMergedAssignments = (current = [], day, serviceItem, photographer) => {
+const getMergedAssignments = (current = [], day, serviceItem, photographer, payAmount) => {
   const photoId = getPhotoId(photographer);
   const serviceId = getServiceId(serviceItem);
   let dayFound = false;
@@ -192,25 +201,24 @@ const getMergedAssignments = (current = [], day, serviceItem, photographer) => {
 
     dayFound = true;
     const assignments = item.assignments || [];
-    const exists = assignments.some((assignment) => getServiceId(assignment.serviceId) === serviceId);
+    const serviceQuantity = getServiceQuantity(serviceItem);
+    const serviceAssignments = assignments.filter((assignment) => getServiceId(assignment.serviceId) === serviceId);
     return {
       day,
-      assignments: exists
-        ? assignments.map((assignment) => (
-          getServiceId(assignment.serviceId) === serviceId
-            ? { photographerId: photographer, serviceId }
-            : assignment
-        ))
-        : [...assignments, { photographerId: photographer, serviceId }],
+      assignments: serviceAssignments.length >= serviceQuantity
+        ? assignments
+        : [...assignments, { photographerId: photographer, serviceId, payAmount }],
     };
   });
 
-  if (!dayFound) assigned.push({ day, assignments: [{ photographerId: photographer, serviceId }] });
+  if (!dayFound) assigned.push({ day, assignments: [{ photographerId: photographer, serviceId, payAmount }] });
   return assigned;
 };
 const getUnassignedServiceForRole = (booking, event, role) => {
-  const assignedServiceIds = new Set(getAssignedEntries(booking, event.day).map((assignment) => getServiceId(assignment.serviceId)));
-  return event.services?.find((item) => getServiceRole(item) === role && !assignedServiceIds.has(getServiceId(item)));
+  return event.services?.find((item) => (
+    getServiceRole(item) === role &&
+    getAssignedCountForService(booking, event.day, item) < getServiceQuantity(item)
+  ));
 };
 const getUniqueAssignedPhotographers = (booking, allPhotographers = []) => {
   const map = new Map();
@@ -262,6 +270,7 @@ export default function BookingDetail() {
   const [selectedDay, setSelectedDay] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [assigningPhotographer, setAssigningPhotographer] = useState(null);
+  const [assignmentPayAmount, setAssignmentPayAmount] = useState("");
   const [draftAssigned, setDraftAssigned] = useState([]);
   const [workStatus, setWorkStatus] = useState("");
   const [paymentForm, setPaymentForm] = useState({ amount: "", transactionId: "", paymentMethod: "upi", note: "" });
@@ -324,7 +333,33 @@ export default function BookingDetail() {
       unavailable: photographers.length - availableCount,
     };
   }) : [];
-  const categoryPhotographers = selectedCategory ? availablePhotographers.filter((photo) => photo.role === selectedCategory) : [];
+  const selectedRoleNeed = selectedCategory
+    ? selectedDayNeeds.find((item) => item.role === selectedCategory)
+    : null;
+  const selectedDayAssignedIds = selectedDay ? getAssignedIdsForDay(draftBooking, selectedDay.day) : [];
+  const selectedRoleAssigned = selectedCategory && selectedDay
+    ? getAssignedRoleCount(draftBooking, selectedDay.day, selectedCategory, allPhotographers, selectedDay)
+    : 0;
+  const selectedRoleRemaining = Math.max(0, (selectedRoleNeed?.count || 1) - selectedRoleAssigned);
+  const selectedRoleAvailableCount = selectedCategory
+    ? availablePhotographers.filter((photo) => (
+      photo.role === selectedCategory &&
+      !selectedDayAssignedIds.includes(photo.id || photo._id) &&
+      !getPhotographerConflict(photo, selectedDay, draftBooking)
+    )).length
+    : 0;
+  const needsExtraPhotographers = selectedCategory
+    ? selectedRoleAvailableCount < selectedRoleRemaining
+    : false;
+  const rolePhotographers = selectedCategory
+    ? availablePhotographers.filter((photo) => photo.role === selectedCategory)
+    : [];
+  const extraPhotographers = needsExtraPhotographers
+    ? allPhotographers.filter((photo) => photo.role !== selectedCategory)
+    : [];
+  const categoryPhotographers = selectedCategory
+    ? [...rolePhotographers, ...extraPhotographers]
+    : [];
   const assignedPhotographers = getUniqueAssignedPhotographers(booking, allPhotographers);
   const hasDiscount = Number(booking.discountPercentage || 0) > 0;
   const calculatedEstimate = (Number(booking.subtotal || 0) + Number(booking.profitAmount || 0)) || null;
@@ -339,16 +374,27 @@ export default function BookingDetail() {
     return sum + (item.assignments || []).filter((assignment) => getPhotoId(assignment.photographerId) && getServiceId(assignment.serviceId)).length;
   }, 0);
 
+  const openAssignmentDialog = (photo) => {
+    setAssigningPhotographer(photo);
+    setAssignmentPayAmount(String(photo.perDayRate || 0));
+    setAssignmentWorkUnits("1");
+  };
+
   const confirmAssignment = () => {
     if (!selectedDay || !assigningPhotographer) return;
     if (getPhotographerConflict(assigningPhotographer, selectedDay, draftBooking)) return;
+    const payAmount = Math.max(0, Number(assignmentPayAmount) || 0);
+    if (payAmount <= 0) {
+      toast({ title: "Pay amount required", description: "Enter the amount payable to this photographer for the assignment." });
+      return;
+    }
     const serviceToAssign = getUnassignedServiceForRole(draftBooking, selectedDay, selectedCategory);
     if (!serviceToAssign) {
-      toast({ title: "Role filled", description: "All services in this category already have photographers." });
+      toast({ title: "Quantity limit reached", description: "This service already has the required number of photographers." });
       setAssigningPhotographer(null);
       return;
     }
-    setDraftAssigned((current) => getMergedAssignments(current, selectedDay.day, serviceToAssign, assigningPhotographer));
+    setDraftAssigned((current) => getMergedAssignments(current, selectedDay.day, serviceToAssign, assigningPhotographer, payAmount));
     toast({ title: "Selected", description: "Photographer added to assignment draft." });
     setAssigningPhotographer(null);
   };
@@ -535,6 +581,109 @@ export default function BookingDetail() {
     });
   };
 
+  const handleDownloadBill = () => {
+    const escapeHtml = (value) => String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+    const rows = [];
+    (booking.events || []).forEach((event) => {
+      (event.services || []).forEach((item) => {
+        rows.push({
+          group: `Day ${event.day} - ${formatDateValue(event.date)}${event.location ? `, ${event.location}` : ""}`,
+          name: getServiceName(item),
+          quantity: getServiceQuantity(item),
+        });
+      });
+    });
+    (booking.addons || []).forEach((item) => {
+      rows.push({
+        group: "Add-on",
+        name: item.serviceId?.name || item.serviceId || "Add-on",
+        quantity: Math.max(1, Number(item.quantity) || 1),
+      });
+    });
+
+    const billWindow = window.open("", "_blank", "width=900,height=700");
+    if (!billWindow) {
+      toast({ title: "Popup blocked", description: "Allow popups to download the bill PDF." });
+      return;
+    }
+
+    const rowHtml = rows.map((row) => `
+      <tr>
+        <td>${escapeHtml(row.group)}</td>
+        <td>${escapeHtml(row.name)}</td>
+        <td class="right">${row.quantity}</td>
+      </tr>
+    `).join("");
+
+    billWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>Bill ${booking.bookingId || booking.id}</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #111827; margin: 32px; }
+            .top { display: flex; justify-content: space-between; gap: 24px; border-bottom: 2px solid #111827; padding-bottom: 18px; }
+            h1 { margin: 0; font-size: 24px; }
+            h2 { margin: 24px 0 8px; font-size: 16px; }
+            p { margin: 4px 0; color: #4b5563; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+            th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; vertical-align: top; }
+            th { background: #f3f4f6; color: #374151; }
+            .right { text-align: right; }
+            .totals { margin-left: auto; width: 340px; margin-top: 18px; }
+            .totals div { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #e5e7eb; }
+            .grand { font-weight: 700; font-size: 18px; color: #111827; }
+            .muted { color: #6b7280; font-size: 12px; }
+            @media print { button { display: none; } body { margin: 20px; } }
+          </style>
+        </head>
+        <body>
+          <button onclick="window.print()" style="float:right;padding:8px 14px;margin-bottom:12px;">Download PDF</button>
+          <div class="top">
+            <div>
+              <h1>TK Moments Capture</h1>
+              <p>Bill / Estimate</p>
+            </div>
+            <div class="right">
+              <p><b>Booking:</b> ${escapeHtml(booking.bookingId || booking.id)}</p>
+              <p><b>Date:</b> ${formatDateValue(new Date())}</p>
+              <p><b>Status:</b> ${escapeHtml(booking.status || "-")}</p>
+            </div>
+          </div>
+          <h2>Customer</h2>
+          <p><b>${escapeHtml(customer.name || "-")}</b></p>
+          <p>${escapeHtml(customer.email || "")}</p>
+          <p>${escapeHtml(customer.phone || "")}</p>
+          <h2>Service Breakdown</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Service</th>
+                <th class="right">Qty</th>
+              </tr>
+            </thead>
+            <tbody>${rowHtml || `<tr><td colspan="3">No services found</td></tr>`}</tbody>
+          </table>
+          <div class="totals">
+            ${hasDiscount ? `<div><span>Discount (${booking.discountPercentage || 0}%)</span><b>-${formatCurrency(booking.discountAmount || 0, settings.currency)}</b></div>` : ""}
+            <div class="grand"><span>Total</span><span>${formatCurrency(displayTotal || 0, settings.currency)}</span></div>
+            <div><span>Paid</span><b>${formatCurrency(booking.payment?.paidAmount || 0, settings.currency)}</b></div>
+            <div><span>Remaining</span><b>${formatCurrency(booking.payment?.remainingAmount || 0, settings.currency)}</b></div>
+          </div>
+          <p class="muted">Generated from admin booking details.</p>
+          <script>window.onload = () => setTimeout(() => window.print(), 250);</script>
+        </body>
+      </html>
+    `);
+    billWindow.document.close();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -552,6 +701,9 @@ export default function BookingDetail() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button onClick={handleDownloadBill} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-all hover:bg-slate-50 dark:border-border dark:text-muted-foreground dark:hover:bg-slate-900">
+            <Download className="h-4 w-4" /> Bill PDF
+          </button>
           {status !== "confirmed" && (
             <button onClick={handleConfirmRequest} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-all shadow-sm">
               <CheckCircle className="h-4 w-4" /> Confirm Request
@@ -604,8 +756,18 @@ export default function BookingDetail() {
                 const assigned = getAssignedPhotographer(draftBooking, event.day);
                 const requiredRoles = getEventRequiredRoles(event);
                 const assignedIds = getAssignedIdsForDay(draftBooking, event.day);
-                const requiredCount = event.services?.length || 0;
+                const requiredCount = event.services?.reduce((sum, item) => sum + getServiceQuantity(item), 0) || 0;
                 const isEventFilled = requiredCount > 0 && assignedIds.length >= requiredCount;
+                const assignmentState = requiredCount === 0 || assignedIds.length === 0
+                  ? "none"
+                  : assignedIds.length >= requiredCount
+                    ? "full"
+                    : "partial";
+                const assignmentIndicator = {
+                  none: "bg-red-50 text-red-700 ring-red-200",
+                  partial: "bg-orange-50 text-orange-700 ring-orange-200",
+                  full: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+                }[assignmentState];
                 return (
                   <div key={event.day} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-border">
                     <div className="flex-1">
@@ -624,7 +786,14 @@ export default function BookingDetail() {
                           const serviceName = getServiceName(item);
                           const role = getServiceRole(item);
                           const showRole = shouldShowRoleLabel(serviceName, role);
+                          const requiredQuantity = getServiceQuantity(item);
                           const photos = getAssignedPhotosForService(draftBooking, event.day, item, allPhotographers);
+                          const serviceState = photos.length === 0 ? "none" : photos.length >= requiredQuantity ? "full" : "partial";
+                          const serviceIndicator = {
+                            none: "bg-red-50 text-red-700 ring-red-200",
+                            partial: "bg-orange-50 text-orange-700 ring-orange-200",
+                            full: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+                          }[serviceState];
                           const hasAvailable = role ? getAvailableCountForRole(allPhotographers, role, event) > 0 : true;
                           const shouldShowUnavailable = !photos.length && !hasAvailable;
                           return (
@@ -636,6 +805,9 @@ export default function BookingDetail() {
                                   <span>{getRoleLabel(role)}</span>
                                 </>
                               )}
+                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${serviceIndicator}`}>
+                                {photos.length}/{requiredQuantity} assigned
+                              </span>
                               <span className="text-slate-300">|</span>
                               {photos.length ? (
                                 <span className="inline-flex items-center gap-1 font-semibold text-primary">
@@ -660,7 +832,9 @@ export default function BookingDetail() {
                         </div>
                       )}
                       <p className="ml-8 mt-2 text-[11px] text-slate-400 dark:text-muted-foreground/70">
-                        {assignedIds.length}/{event.services?.length || 0} photographers assigned
+                        <span className={`inline-flex rounded-full px-2 py-0.5 font-semibold ring-1 ${assignmentIndicator}`}>
+                          {assignedIds.length}/{requiredCount} photographers assigned
+                        </span>
                       </p>
                     </div>
                     <button
@@ -714,6 +888,12 @@ export default function BookingDetail() {
                   {categoryStats.map((category) => {
                     const Icon = category.icon;
                     const hasAvailable = category.available > 0;
+                    const fillState = category.assigned === 0 ? "none" : category.assigned >= category.required ? "full" : "partial";
+                    const fillCls = {
+                      none: "bg-red-50 text-red-700 ring-red-200",
+                      partial: "bg-orange-50 text-orange-700 ring-orange-200",
+                      full: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+                    }[fillState];
                     return (
                       <button
                         key={category.role}
@@ -734,8 +914,11 @@ export default function BookingDetail() {
                             Needed for {category.services.join(", ")}
                           </p>
                         )}
-                        <p className="mt-1 text-xs text-slate-500 dark:text-muted-foreground">
-                          {category.assigned}/{category.required} assigned, {category.available} available
+                        <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-muted-foreground">
+                          <span className={`rounded-full px-2 py-0.5 font-semibold ring-1 ${fillCls}`}>
+                            {category.assigned}/{category.required} assigned
+                          </span>
+                          <span>{category.available} available</span>
                         </p>
                       </button>
                     );
@@ -756,6 +939,12 @@ export default function BookingDetail() {
                       <p className="text-sm text-slate-500 dark:text-muted-foreground">No photographers in this category.</p>
                     </div>
                   ) : (
+                    <>
+                    {needsExtraPhotographers && (
+                      <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-xs font-medium text-orange-700">
+                        Only {selectedRoleAvailableCount} matching {selectedCategoryConfig?.label?.toLowerCase()} available for {selectedRoleRemaining} remaining slot(s). Extra available photographers are shown below.
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {categoryPhotographers.map((photo) => {
                         const conflict = getPhotographerConflict(photo, selectedDay, draftBooking);
@@ -787,7 +976,7 @@ export default function BookingDetail() {
                               )}
                             </div>
                             <button
-                              onClick={() => !isUnavailable && setAssigningPhotographer(photo)}
+                              onClick={() => !isUnavailable && openAssignmentDialog(photo)}
                               disabled={isUnavailable}
                               className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${isUnavailable ? "cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-500" : "bg-primary hover:bg-primary/90 text-white"}`}
                             >
@@ -797,6 +986,7 @@ export default function BookingDetail() {
                         );
                       })}
                     </div>
+                    </>
                   )}
                 </div>
               )}
@@ -1219,18 +1409,37 @@ export default function BookingDetail() {
             </DialogDescription>
           </DialogHeader>
           {assigningPhotographer && (
-            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-border/60">
-              {assigningPhotographer.avatar ? (
-                <img src={assigningPhotographer.avatar} alt={assigningPhotographer.name} className="h-10 w-10 rounded-xl object-cover" />
-              ) : (
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
-                  {(assigningPhotographer.name || "?").slice(0, 2).toUpperCase()}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-border/60">
+                {assigningPhotographer.avatar ? (
+                  <img src={assigningPhotographer.avatar} alt={assigningPhotographer.name} className="h-10 w-10 rounded-xl object-cover" />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
+                    {(assigningPhotographer.name || "?").slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <p className="font-semibold text-sm text-slate-900 dark:text-foreground">{assigningPhotographer.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-muted-foreground">{getRoleLabel(assigningPhotographer.role)} - {assigningPhotographer.city}</p>
                 </div>
-              )}
-              <div>
-                <p className="font-semibold text-sm text-slate-900 dark:text-foreground">{assigningPhotographer.name}</p>
-                <p className="text-xs text-slate-500 dark:text-muted-foreground">{assigningPhotographer.role} - {assigningPhotographer.city}</p>
               </div>
+              <div className="grid gap-3">
+                <label className="space-y-1">
+                  <span className="text-xs font-semibold text-slate-500 dark:text-muted-foreground">Pay amount</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={assignmentPayAmount}
+                    onChange={(event) => setAssignmentPayAmount(event.target.value)}
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/30 dark:border-border dark:bg-card dark:text-foreground"
+                    placeholder="Photographer amount"
+                  />
+                </label>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-muted-foreground">
+                Photographer payment will use this amount for this booking assignment.
+              </p>
             </div>
           )}
           <DialogFooter className="gap-2">

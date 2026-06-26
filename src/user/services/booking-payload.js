@@ -30,7 +30,7 @@ export function buildBookingPayload({
         .filter((serviceId) => validServiceIds.has(serviceId) && objectIdPattern.test(serviceId))
         .map((serviceId) => ({
           serviceId,
-          quantity: 1,
+          quantity: Math.max(1, Math.floor(Number(event.serviceQuantities?.[serviceId]) || 1)),
         }))
 
       return {

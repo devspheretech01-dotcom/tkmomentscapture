@@ -53,7 +53,8 @@ export function formatPrice(amount) {
 export function calculateEventTotal(event, services) {
   return event.selectedServices.reduce((total, serviceId) => {
     const service = services.find((s) => s.id === serviceId)
-    return total + (service?.pricePerDay || 0)
+    const quantity = Math.max(1, Number(event.serviceQuantities?.[serviceId]) || 1)
+    return total + ((service?.pricePerDay || 0) * quantity)
   }, 0)
 }
 

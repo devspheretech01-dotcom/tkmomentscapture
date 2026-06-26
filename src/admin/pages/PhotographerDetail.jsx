@@ -55,6 +55,11 @@ const getAssignedServiceIdsForPhoto = (booking, day, photographerId) => {
     .map((item) => getServiceId(item.serviceId))
     .filter(Boolean);
 };
+const getAssignedEntriesForPhoto = (booking, day, photographerId) => {
+  const assigned = booking.assigned?.find((item) => item.day === day);
+  if (!Array.isArray(assigned?.assignments)) return [];
+  return assigned.assignments.filter((item) => getPhotoId(item.photographerId) === photographerId);
+};
 const MONTHS = [
   { value: "all", label: "All Months" },
   { value: "01", label: "January" },
@@ -116,9 +121,14 @@ export default function PhotographerDetail() {
         const isAssigned = getAssignedPhotoRefs(booking, event.day).some((photo) => getPhotoId(photo) === photographerId);
         if (!isAssigned) return [];
         const assignedServiceIds = getAssignedServiceIdsForPhoto(booking, event.day, photographerId);
+        const assignedEntries = getAssignedEntriesForPhoto(booking, event.day, photographerId);
         const services = assignedServiceIds.length
           ? (event.services || []).filter((service) => assignedServiceIds.includes(getServiceId(service)))
           : (event.services || []).filter((service) => getServiceRole(service) === photographer.role);
+        const amount = assignedEntries.reduce((sum, entry) => {
+          const customAmount = Number(entry.payAmount);
+          return sum + (Number.isFinite(customAmount) && customAmount > 0 ? customAmount : Number(photographer.perDayRate || 0));
+        }, 0);
         return [{
           id: `${booking.id}-${event.day}`,
           bookingId: booking.bookingId || booking.id,
@@ -127,7 +137,7 @@ export default function PhotographerDetail() {
           location: event.location,
           day: event.day,
           services,
-          amount: photographer.perDayRate || 0,
+          amount: amount || photographer.perDayRate || 0,
           status: booking.status || "pending",
         }];
       })
@@ -361,7 +371,7 @@ export default function PhotographerDetail() {
                 </tbody>
               </table>
               <div className="border-t border-slate-100 bg-slate-50 px-5 py-3 text-right text-sm font-bold text-slate-900 dark:border-border dark:bg-slate-900/30 dark:text-foreground">
-                {filteredBookedAssignments.length} day{filteredBookedAssignments.length === 1 ? "" : "s"} x {formatMoney(photographer.perDayRate)} = Total {formatMoney(bookedTotal)}
+                Assignment pay total: {formatMoney(bookedTotal)}
               </div>
             </div>
           ) : (

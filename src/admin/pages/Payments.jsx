@@ -10,6 +10,7 @@ import {
   useGetPaymentsByPhotographer,
   useGetUnpaidPayments,
   useUpdatePhotographerPayment,
+  useGetBookings,
 } from "@admin/services/api";
 import { Input } from "@admin/components/ui/input";
 import { Button } from "@admin/components/ui/button";
@@ -28,12 +29,44 @@ const STATUS_STYLE = {
 
 const getPhotographer = (payment) => payment.photographerId || {};
 const getPhotographerId = (photographer) => photographer?._id || photographer?.id || photographer;
+const getId = (value) => value?._id || value?.id || value || "";
 const getBookedMonths = (photographer) => (
   [...new Set((photographer?.bookedDates || [])
     .map((date) => String(date).slice(0, 7))
     .filter((date) => /^\d{4}-\d{2}$/.test(date)))]
     .sort((a, b) => b.localeCompare(a))
 );
+const getPhotographerWorkSummary = (bookings = [], photographerId, month, fallbackRate = 0) => {
+  const workItems = [];
+  bookings.forEach((booking) => {
+    (booking.assigned || []).forEach((assign) => {
+      const event = (booking.events || []).find((item) => item.day === assign.day);
+      if (!event?.date || !String(event.date).startsWith(month)) return;
+      (assign.assignments || []).forEach((assignment) => {
+        if (getId(assignment.photographerId) !== photographerId) return;
+        const amount = Number(assignment.payAmount) > 0 ? Number(assignment.payAmount) : Number(fallbackRate || 0);
+        workItems.push({ amount, date: event.date });
+      });
+    });
+  });
+  const workDates = new Set(workItems.map((item) => item.date).filter(Boolean));
+  return {
+    totalAmount: workItems.reduce((sum, item) => sum + item.amount, 0),
+    totalDays: workDates.size,
+  };
+};
+const getAssignmentMonths = (bookings = [], photographerId) => {
+  const months = bookings.flatMap((booking) => (
+    (booking.assigned || []).flatMap((assign) => {
+      const hasPhotographer = (assign.assignments || []).some((assignment) => getId(assignment.photographerId) === photographerId);
+      if (!hasPhotographer) return [];
+      const event = (booking.events || []).find((item) => item.day === assign.day);
+      return event?.date ? [String(event.date).slice(0, 7)] : [];
+    })
+  )).filter((date) => /^\d{4}-\d{2}$/.test(date));
+
+  return [...new Set(months)].sort((a, b) => b.localeCompare(a));
+};
 const formatDateTime = (value) => {
   if (!value) return "-";
   const date = new Date(value);
@@ -89,15 +122,31 @@ export default function Payments() {
   const { data: monthPayments = [], isLoading: isMonthLoading } = useGetPaymentsByMonth(month, { query: { enabled: mode === "month" && !!month, retry: false } });
   const { data: photographerPayments = [], isLoading: isPhotographerLoading } = useGetPaymentsByPhotographer(photographerId, { query: { enabled: mode === "photographer" && !!photographerId, retry: false } });
   const { data: photographers = [] } = useGetPhotographers();
+  const { data: bookings = [] } = useGetBookings();
   const updatePayment = useUpdatePhotographerPayment();
 
   const selectedPaymentPhotographer = photographers.find((p) => getPhotographerId(p) === form.photographerId);
   const selectedFilterPhotographer = photographers.find((p) => getPhotographerId(p) === photographerId);
-  const paymentMonths = getBookedMonths(selectedPaymentPhotographer);
-  const allBookedMonths = [...new Set(photographers.flatMap(getBookedMonths))].sort((a, b) => b.localeCompare(a));
-  const filterMonths = mode === "month" ? allBookedMonths : getBookedMonths(selectedFilterPhotographer);
-  const expectedDays = selectedPaymentPhotographer?.bookedDates?.filter((date) => String(date).startsWith(form.month)).length || 0;
-  const expectedTotal = expectedDays * (selectedPaymentPhotographer?.perDayRate || 0);
+  const paymentMonths = [...new Set([
+    ...getBookedMonths(selectedPaymentPhotographer),
+    ...getAssignmentMonths(bookings, form.photographerId),
+  ])].sort((a, b) => b.localeCompare(a));
+  const allBookedMonths = [...new Set([
+    ...photographers.flatMap(getBookedMonths),
+    ...photographers.flatMap((photographer) => getAssignmentMonths(bookings, getPhotographerId(photographer))),
+  ])].sort((a, b) => b.localeCompare(a));
+  const filterMonths = mode === "month" ? allBookedMonths : [...new Set([
+    ...getBookedMonths(selectedFilterPhotographer),
+    ...getAssignmentMonths(bookings, photographerId),
+  ])].sort((a, b) => b.localeCompare(a));
+  const workSummary = getPhotographerWorkSummary(
+    bookings,
+    form.photographerId,
+    form.month,
+    selectedPaymentPhotographer?.perDayRate || 0
+  );
+  const expectedDays = workSummary.totalDays;
+  const expectedTotal = workSummary.totalAmount;
   const existingPaymentForForm = allPayments.find((payment) => {
     const photographer = getPhotographer(payment);
     return form.photographerId && form.month &&
@@ -244,8 +293,8 @@ export default function Payments() {
         {selectedPaymentPhotographer && (
           <div className="grid gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-900/40 dark:text-muted-foreground sm:grid-cols-4">
             <span>Current rate: <b>{formatCurrency(selectedPaymentPhotographer.perDayRate || 0, settings.currency)}</b></span>
-            <span>{form.month} days: <b>{expectedDays}</b></span>
-            <span>Expected total: <b>{formatCurrency(expectedTotal, settings.currency)}</b></span>
+            <span>{form.month} days: <b>{expectedDays || 0}</b></span>
+            <span>Assignment total: <b>{formatCurrency(expectedTotal, settings.currency)}</b></span>
             <span>Pay now: <b>{formatCurrency(payableAmount || 0, settings.currency)}</b></span>
           </div>
         )}
@@ -380,6 +429,20 @@ export default function Payments() {
                 <span>Locked rate: <b>{formatCurrency(selectedPayment.perDayRate || 0, settings.currency)}</b></span>
                 <span>Working days: <b>{selectedPayment.totalDays || 0}</b></span>
               </div>
+              {selectedPayment.workItems?.length > 0 && (
+                <div className="rounded-xl border border-border">
+                  <div className="border-b border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Assignment Pay Breakdown</div>
+                  <div className="divide-y divide-border">
+                    {selectedPayment.workItems.map((item, index) => (
+                      <div key={`${item.bookingCode}-${index}`} className="grid gap-2 px-4 py-2 text-xs sm:grid-cols-[1fr_1fr_auto]">
+                        <span>{item.date || "-"}</span>
+                        <span>{item.serviceName || "Service"} {item.bookingCode ? `(${item.bookingCode})` : ""}</span>
+                        <span className="text-right font-semibold">{formatCurrency(item.amount || 0, settings.currency)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {!selectedPayment.transactions?.length ? (
                 <p className="rounded-xl border border-dashed border-border py-8 text-center text-sm text-muted-foreground">No transactions saved.</p>
               ) : selectedPayment.transactions.map((item, index) => (
