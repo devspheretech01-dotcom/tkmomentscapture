@@ -377,7 +377,7 @@ export default function BookingDetail() {
   const openAssignmentDialog = (photo) => {
     setAssigningPhotographer(photo);
     setAssignmentPayAmount(String(photo.perDayRate || 0));
-    setAssignmentWorkUnits("1");
+    // setAssignmentWorkUnits("1");
   };
 
   const confirmAssignment = () => {
