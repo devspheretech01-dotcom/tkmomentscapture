@@ -26,7 +26,31 @@ const getDateKey = (value) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "" : format(date, "yyyy-MM-dd");
 };
-const hasEventOnDate = (booking, date) => !date || (booking.events || []).some((event) => getDateKey(event.date) === date);
+const MONTHS = [
+  { value: "all", label: "All Months" },
+  { value: "01", label: "January" },
+  { value: "02", label: "February" },
+  { value: "03", label: "March" },
+  { value: "04", label: "April" },
+  { value: "05", label: "May" },
+  { value: "06", label: "June" },
+  { value: "07", label: "July" },
+  { value: "08", label: "August" },
+  { value: "09", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+const getMonthValue = (value) => getDateKey(value).slice(5, 7);
+const getYearValue = (value) => getDateKey(value).slice(0, 4);
+const hasEventInMonthYear = (booking, month, year) => (
+  (month === "all" && year === "all") ||
+  (booking.events || []).some((event) => {
+    const eventMonth = getMonthValue(event.date);
+    const eventYear = getYearValue(event.date);
+    return (month === "all" || eventMonth === month) && (year === "all" || eventYear === year);
+  })
+);
 const getNumberOrNull = (value) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
@@ -59,13 +83,20 @@ export default function Bookings() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
-  const [eventDate, setEventDate] = useState("");
+  const [eventMonth, setEventMonth] = useState("all");
+  const [eventYear, setEventYear] = useState("all");
   const [sort, setSort] = useState("newest");
   const { data: apiBookings = [], isLoading, error } = useGetBookings();
   const deleteBooking = useDeleteBooking();
   const updateBooking = useUpdateBooking();
 
   const allBookings = apiBookings.filter((booking) => booking.type === "booking" || !booking.type);
+  const eventYears = [
+    "all",
+    ...new Set(allBookings.flatMap((booking) => (
+      booking.events || []
+    ).map((event) => getYearValue(event.date)).filter(Boolean))),
+  ].sort((a, b) => (a === "all" ? -1 : b === "all" ? 1 : Number(b) - Number(a)));
   const bookings = allBookings.filter((b) => {
     const customer = b.customer || {};
     const firstEvent = getFirstEvent(b);
@@ -77,7 +108,7 @@ export default function Bookings() {
       firstEvent.location?.toLowerCase().includes(query) ||
       b.bookingId?.toLowerCase().includes(query);
     const matchStatus = status === "all" || getBookingStatus(b) === status;
-    const matchDate = hasEventOnDate(b, eventDate);
+    const matchDate = hasEventInMonthYear(b, eventMonth, eventYear);
     return matchSearch && matchStatus && matchDate;
   }).sort((a, b) => {
     if (sort === "oldest") return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
@@ -142,7 +173,7 @@ export default function Bookings() {
       </div>
 
       {/* Filter bar */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] items-center">
         <div className="relative w-full max-w-full md:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-muted-foreground/70" />
           <Input
@@ -152,25 +183,27 @@ export default function Bookings() {
             className="pl-9 h-9 w-full bg-card text-sm border-border rounded-xl shadow-sm dark:bg-card"
           />
         </div>
-        <div className="relative w-full md:w-44">
-          <Calendar className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 dark:text-muted-foreground/70" />
-          <Input
-            type="date"
-            value={eventDate}
-            onChange={(e) => setEventDate(e.target.value)}
-            className="h-9 w-full rounded-xl border-border bg-card pl-9 pr-8 text-sm shadow-sm dark:bg-card"
-          />
-          {eventDate && (
-            <button
-              type="button"
-              onClick={() => setEventDate("")}
-              className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
-              aria-label="Clear date filter"
-            >
-              <XCircle className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
+        <Select value={eventMonth} onValueChange={setEventMonth} className="w-full md:w-40">
+          <SelectTrigger className="h-9 w-full bg-card border-border rounded-xl shadow-sm text-sm dark:bg-card">
+            <Calendar className="h-3.5 w-3.5 mr-1.5 text-slate-400 dark:text-muted-foreground" />
+            <SelectValue placeholder="Month" />
+          </SelectTrigger>
+          <SelectContent>
+            {MONTHS.map((month) => (
+              <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={eventYear} onValueChange={setEventYear} className="w-full md:w-32">
+          <SelectTrigger className="h-9 w-full bg-card border-border rounded-xl shadow-sm text-sm dark:bg-card">
+            <SelectValue placeholder="Year" />
+          </SelectTrigger>
+          <SelectContent>
+            {eventYears.map((year) => (
+              <SelectItem key={year} value={year}>{year === "all" ? "All Years" : year}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={status} onValueChange={setStatus} className="w-full md:w-44">
           <SelectTrigger className="h-9 w-full bg-card border-border rounded-xl shadow-sm text-sm dark:bg-card">
             <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5 text-slate-400 dark:text-muted-foreground" />

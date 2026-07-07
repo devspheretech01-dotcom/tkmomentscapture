@@ -220,6 +220,17 @@ const getUnassignedServiceForRole = (booking, event, role) => {
     getAssignedCountForService(booking, event.day, item) < getServiceQuantity(item)
   ));
 };
+const getNextAssignableService = (booking, event, preferredRoles = []) => {
+  const roles = preferredRoles.filter(Boolean);
+  for (const role of roles) {
+    const service = getUnassignedServiceForRole(booking, event, role);
+    if (service) return service;
+  }
+
+  return event.services?.find((item) => (
+    getAssignedCountForService(booking, event.day, item) < getServiceQuantity(item)
+  ));
+};
 const getUniqueAssignedPhotographers = (booking, allPhotographers = []) => {
   const map = new Map();
   (booking.assigned || []).forEach((assign) => {
@@ -278,8 +289,8 @@ export default function BookingDetail() {
   const [handoverForms, setHandoverForms] = useState({});
 
   const { data: availability, isLoading: isAvailabilityLoading } = useGetAvailablePhotographers(
-    { date: selectedDay?.date, role: selectedCategory },
-    { query: { enabled: !!selectedDay && !!selectedCategory } }
+    { date: selectedDay?.date },
+    { query: { enabled: !!selectedDay } }
   );
 
   const booking = apiBooking;
@@ -314,9 +325,15 @@ export default function BookingDetail() {
   const draftBooking = { ...booking, assigned: draftAssigned };
   const selectedDayRoles = selectedDay ? getEventRequiredRoles(selectedDay) : [];
   const selectedDayNeeds = selectedDay ? getEventRoleNeeds(selectedDay) : [];
-  const availablePhotographers = selectedCategory ? (availability || []) : allPhotographers;
+  const availablePhotographers = selectedDay ? (availability || []) : allPhotographers;
   const selectedCategoryConfig = selectedCategory ? getRoleConfig(selectedCategory) : null;
-  const categoryStats = selectedDay ? selectedDayRoles.map((role) => {
+  const categoryRoles = selectedDay
+    ? [...new Set([
+      ...selectedDayRoles,
+      ...availablePhotographers.map((photo) => photo.role).filter(Boolean),
+    ])].sort((a, b) => getRoleLabel(a).localeCompare(getRoleLabel(b)))
+    : [];
+  const categoryStats = selectedDay ? categoryRoles.map((role) => {
     const config = getRoleConfig(role);
     const need = selectedDayNeeds.find((item) => item.role === role);
     const assignedCount = getAssignedRoleCount(draftBooking, selectedDay.day, role, allPhotographers, selectedDay);
@@ -326,39 +343,20 @@ export default function BookingDetail() {
       role,
       ...config,
       services: need?.services || getRoleServices(selectedDay, role),
-      required: need?.count || 1,
+      required: need?.count || 0,
+      isRequired: !!need,
       assigned: assignedCount,
       total: photographers.length,
       available: availableCount,
       unavailable: photographers.length - availableCount,
     };
   }) : [];
-  const selectedRoleNeed = selectedCategory
-    ? selectedDayNeeds.find((item) => item.role === selectedCategory)
-    : null;
   const selectedDayAssignedIds = selectedDay ? getAssignedIdsForDay(draftBooking, selectedDay.day) : [];
-  const selectedRoleAssigned = selectedCategory && selectedDay
-    ? getAssignedRoleCount(draftBooking, selectedDay.day, selectedCategory, allPhotographers, selectedDay)
-    : 0;
-  const selectedRoleRemaining = Math.max(0, (selectedRoleNeed?.count || 1) - selectedRoleAssigned);
-  const selectedRoleAvailableCount = selectedCategory
-    ? availablePhotographers.filter((photo) => (
-      photo.role === selectedCategory &&
-      !selectedDayAssignedIds.includes(photo.id || photo._id) &&
-      !getPhotographerConflict(photo, selectedDay, draftBooking)
-    )).length
-    : 0;
-  const needsExtraPhotographers = selectedCategory
-    ? selectedRoleAvailableCount < selectedRoleRemaining
-    : false;
-  const rolePhotographers = selectedCategory
-    ? availablePhotographers.filter((photo) => photo.role === selectedCategory)
-    : [];
-  const extraPhotographers = needsExtraPhotographers
-    ? allPhotographers.filter((photo) => photo.role !== selectedCategory)
+  const selectedDayRemainingServices = selectedDay
+    ? (selectedDay.services || []).filter((item) => getAssignedCountForService(draftBooking, selectedDay.day, item) < getServiceQuantity(item))
     : [];
   const categoryPhotographers = selectedCategory
-    ? [...rolePhotographers, ...extraPhotographers]
+    ? availablePhotographers.filter((photo) => photo.role === selectedCategory)
     : [];
   const assignedPhotographers = getUniqueAssignedPhotographers(booking, allPhotographers);
   const hasDiscount = Number(booking.discountPercentage || 0) > 0;
@@ -388,7 +386,10 @@ export default function BookingDetail() {
       toast({ title: "Pay amount required", description: "Enter the amount payable to this photographer for the assignment." });
       return;
     }
-    const serviceToAssign = getUnassignedServiceForRole(draftBooking, selectedDay, selectedCategory);
+    const serviceToAssign = getNextAssignableService(draftBooking, selectedDay, [
+      selectedCategory,
+      assigningPhotographer.role,
+    ]);
     if (!serviceToAssign) {
       toast({ title: "Quantity limit reached", description: "This service already has the required number of photographers." });
       setAssigningPhotographer(null);
@@ -888,7 +889,7 @@ export default function BookingDetail() {
                   {categoryStats.map((category) => {
                     const Icon = category.icon;
                     const hasAvailable = category.available > 0;
-                    const fillState = category.assigned === 0 ? "none" : category.assigned >= category.required ? "full" : "partial";
+                    const fillState = !category.isRequired || category.assigned === 0 ? "none" : category.assigned >= category.required ? "full" : "partial";
                     const fillCls = {
                       none: "bg-red-50 text-red-700 ring-red-200",
                       partial: "bg-orange-50 text-orange-700 ring-orange-200",
@@ -909,15 +910,21 @@ export default function BookingDetail() {
                           </span>
                         </div>
                         <p className="mt-3 text-sm font-bold text-slate-900 dark:text-foreground">{category.label}</p>
-                        {category.services.length > 0 && (
+                        {category.services.length > 0 ? (
                           <p className="mt-1 text-xs text-slate-600 dark:text-muted-foreground">
                             Needed for {category.services.join(", ")}
                           </p>
+                        ) : (
+                          <p className="mt-1 text-xs text-slate-600 dark:text-muted-foreground">
+                            Available on this date
+                          </p>
                         )}
                         <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-muted-foreground">
-                          <span className={`rounded-full px-2 py-0.5 font-semibold ring-1 ${fillCls}`}>
-                            {category.assigned}/{category.required} assigned
-                          </span>
+                          {category.isRequired && (
+                            <span className={`rounded-full px-2 py-0.5 font-semibold ring-1 ${fillCls}`}>
+                              {category.assigned}/{category.required} assigned
+                            </span>
+                          )}
                           <span>{category.available} available</span>
                         </p>
                       </button>
@@ -939,21 +946,14 @@ export default function BookingDetail() {
                       <p className="text-sm text-slate-500 dark:text-muted-foreground">No photographers in this category.</p>
                     </div>
                   ) : (
-                    <>
-                    {needsExtraPhotographers && (
-                      <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-xs font-medium text-orange-700">
-                        Only {selectedRoleAvailableCount} matching {selectedCategoryConfig?.label?.toLowerCase()} available for {selectedRoleRemaining} remaining slot(s). Extra available photographers are shown below.
-                      </div>
-                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {categoryPhotographers.map((photo) => {
                         const conflict = getPhotographerConflict(photo, selectedDay, draftBooking);
                         const assignedIds = getAssignedIdsForDay(draftBooking, selectedDay.day);
                         const isAlreadyAssigned = assignedIds.includes(photo.id || photo._id);
-                        const need = selectedDayNeeds.find((item) => item.role === selectedCategory);
-                        const isRoleFilled = getAssignedRoleCount(draftBooking, selectedDay.day, selectedCategory, allPhotographers, selectedDay) >= (need?.count || 1);
-                        const isUnavailable = !!conflict || isAlreadyAssigned || isRoleFilled;
-                        const unavailableText = isAlreadyAssigned ? "Already assigned to this day" : conflict ? "Not available" : "Required count selected";
+                        const isDayFilled = selectedDayRemainingServices.length === 0;
+                        const isUnavailable = !!conflict || isAlreadyAssigned || isDayFilled;
+                        const unavailableText = isAlreadyAssigned ? "Already assigned to this day" : conflict ? "Not available" : "All services assigned";
                         return (
                           <div key={photo.id} className={`flex items-center gap-3 p-3.5 border rounded-xl transition-all ${isUnavailable ? "border-slate-200 dark:border-border/60 bg-slate-50/80 dark:bg-slate-900/40 opacity-60" : "border-slate-200 dark:border-border/60 bg-white dark:bg-card hover:border-primary/20"}`}>
                             {photo.avatar ? (
@@ -980,13 +980,12 @@ export default function BookingDetail() {
                               disabled={isUnavailable}
                               className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${isUnavailable ? "cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-500" : "bg-primary hover:bg-primary/90 text-white"}`}
                             >
-                              {isAlreadyAssigned ? "Assigned" : isRoleFilled ? "Filled" : conflict ? "Not available" : "Assign"}
+                              {isAlreadyAssigned ? "Assigned" : isDayFilled ? "Filled" : conflict ? "Not available" : "Assign"}
                             </button>
                           </div>
                         );
                       })}
                     </div>
-                    </>
                   )}
                 </div>
               )}
