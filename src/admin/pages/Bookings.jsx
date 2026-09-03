@@ -137,10 +137,6 @@ export default function Bookings() {
   };
 
   const handleDeleteBooking = (booking) => {
-    if (booking.type !== "enquiry" && !["pending", "cancelled"].includes(booking.status)) {
-      toast({ title: "Delete not allowed", description: "Only pending or cancelled bookings can be deleted." });
-      return;
-    }
     if (!window.confirm("Are you sure you want to delete this booking?")) return;
     if (booking.status === "pending" && booking.type !== "enquiry") {
       updateBooking.mutate(
@@ -242,6 +238,8 @@ export default function Bookings() {
             <Link
               key={b.id}
               to={`/admin/bookings/${b.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="block rounded-2xl border border-border/60 bg-card p-4 shadow-sm hover:shadow-md transition"
             >
               <div className="flex items-center gap-3">
@@ -348,23 +346,18 @@ export default function Bookings() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {b.status === "cancelled" && (
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteBooking(b)} disabled={deleteBooking.isPending} className="h-7 w-7 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
                       {b.status === "pending" && (
                         <>
                           <Button variant="ghost" size="icon" onClick={() => handleCancelBooking(b)} disabled={updateBooking.isPending} className="h-7 w-7 rounded-lg text-amber-700 hover:bg-amber-50 hover:text-amber-800">
                             <XCircle className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteBooking(b)} disabled={deleteBooking.isPending || updateBooking.isPending} className="h-7 w-7 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
                         </>
                       )}
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteBooking(b)} disabled={deleteBooking.isPending || updateBooking.isPending} className="h-7 w-7 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                       <Button asChild variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-primary/10 hover:text-primary">
-                        <Link to={`/admin/bookings/${b.id}`}><ArrowRight className="h-3.5 w-3.5" /></Link>
+                        <Link to={`/admin/bookings/${b.id}`} target="_blank" rel="noopener noreferrer" aria-label={`Open booking ${b.bookingId || b.id} in a new tab`}><ArrowRight className="h-3.5 w-3.5" /></Link>
                       </Button>
                     </div>
                   </td>

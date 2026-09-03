@@ -443,10 +443,6 @@ export default function BookingDetail() {
   };
 
   const handleDeleteBooking = () => {
-    if (booking.type !== "enquiry" && !["cancelled", "pending"].includes(booking.status)) {
-      toast({ title: "Delete not allowed", description: "Only pending or cancelled bookings can be deleted." });
-      return;
-    }
     if (!window.confirm("Are you sure you want to delete this record?")) return;
     if (booking.status === "pending" && booking.type !== "enquiry") {
       updateBooking.mutate({ id, data: { status: "cancelled" } }, {
@@ -715,11 +711,9 @@ export default function BookingDetail() {
               <XCircle className="h-4 w-4" /> Cancel
             </button>
           )}
-          {(booking.type === "enquiry" || ["pending", "cancelled"].includes(booking.status)) && (
-            <button onClick={handleDeleteBooking} disabled={deleteBooking.isPending} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60 transition-all">
-              <Trash2 className="h-4 w-4" /> {deleteBooking.isPending ? "Deleting..." : "Delete"}
-            </button>
-          )}
+          <button onClick={handleDeleteBooking} disabled={deleteBooking.isPending} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60 transition-all">
+            <Trash2 className="h-4 w-4" /> {deleteBooking.isPending ? "Deleting..." : "Delete"}
+          </button>
         </div>
       </div>
 
